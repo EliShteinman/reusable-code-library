@@ -1,0 +1,541 @@
+# kubernetes-templates/databases/mongodb/statefulset-complete.yaml
+# MongoDB StatefulSet Template for Production
+# Advanced setup with replica sets, automatic storage, and high availability
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${APP_NAME}-mongo-config
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+data:
+  MONGO_INITDB_ROOT_USERNAME: "mongoadmin"
+  MONGO_DB_NAME: "${DATABASE_NAME}"
+  MONGO_COLLECTION_NAME: "${COLLECTION_NAME}"
+  MONGO_INITDB_DATABASE: "${DATABASE_NAME}"
+  # StatefulSet specific configuration
+  MONGO_REPLICA_SET_NAME: "${APP_NAME}-rs"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${APP_NAME}-mongo-credentials
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  MONGO_INITDB_ROOT_PASSWORD: "${MONGO_ROOT_PASSWORD}"
+  # Replica set key for authentication between nodes
+  MONGO_REPLICA_SET_KEY: "${MONGO_REPLICA_SET_KEY}"
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${APP_NAME}-mongo-statefulset
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+    app.kubernetes.io/version: "${MONGO_VERSION}"
+spec:
+  serviceName: "${APP_NAME}-mongo-headless-service"
+  replicas: ${MONGO_REPLICAS}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongo
+      app.kubernetes.io/instance: ${APP_NAME}-mongo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongo
+        app.kubernetes.io/instance: ${APP_NAME}-mongo
+        app.kubernetes.io/part-of: ${APP_NAME}
+        app.kubernetes.io/component: database
+      annotations:
+        # Force pod restart on config changes
+        config/checksum: "${CONFIG_CHECKSUM}"
+    spec:
+      serviceAccountName: ${APP_NAME}-mongo-serviceaccount
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      affinity:
+        # Prefer spreading pods across nodes for high availability
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: mongo
+                  app.kubernetes.io/instance: ${APP_NAME}-mongo
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: mongo
+        image: mongo:${MONGO_VERSION}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: mongodb
+          containerPort: 27017
+          protocol: TCP
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: ${APP_NAME}-mongo-config
+              key: MONGO_INITDB_ROOT_USERNAME
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-mongo-credentials
+              key: MONGO_INITDB_ROOT_PASSWORD
+        - name: MONGO_INITDB_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: ${APP_NAME}-mongo-config
+              key: MONGO_INITDB_DATABASE
+        - name: MONGO_REPLICA_SET_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: ${APP_NAME}-mongo-config
+              key: MONGO_REPLICA_SET_NAME
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        args:
+        - --replSet
+        - $(MONGO_REPLICA_SET_NAME)
+        - --bind_ip_all
+        - --auth
+        - --keyFile
+        - /data/configdb/key.txt
+        - --quiet
+        resources:
+          requests:
+            cpu: "${MONGO_CPU_REQUEST}"
+            memory: "${MONGO_MEMORY_REQUEST}"
+            ephemeral-storage: "1Gi"
+          limits:
+            cpu: "${MONGO_CPU_LIMIT}"
+            memory: "${MONGO_MEMORY_LIMIT}"
+            ephemeral-storage: "2Gi"
+        readinessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        livenessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+        - name: mongo-config-dir
+          mountPath: /data/configdb
+        - name: mongo-init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                mongosh --eval "
+                  try {
+                    db.adminCommand('shutdown');
+                  } catch(e) {
+                    print('Graceful shutdown failed, forcing...');
+                  }
+                "
+      volumes:
+      - name: mongo-config-dir
+        secret:
+          secretName: ${APP_NAME}-mongo-credentials
+          items:
+          - key: MONGO_REPLICA_SET_KEY
+            path: key.txt
+            mode: 0400
+      - name: mongo-init-scripts
+        configMap:
+          name: ${APP_NAME}-mongo-init-scripts
+          defaultMode: 0755
+      initContainers:
+      - name: mongo-init-permissions
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          chown -R 999:999 /data/db
+          chmod 755 /data/db
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+        securityContext:
+          runAsUser: 0
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-persistent-storage
+      labels:
+        app.kubernetes.io/name: mongo
+        app.kubernetes.io/instance: ${APP_NAME}-mongo
+        app.kubernetes.io/part-of: ${APP_NAME}
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "${STORAGE_CLASS}"
+      resources:
+        requests:
+          storage: ${STORAGE_SIZE}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-mongo-headless-service
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+  ports:
+  - name: mongodb
+    port: 27017
+    targetPort: mongodb
+    protocol: TCP
+  publishNotReadyAddresses: true  # Important for StatefulSet
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-mongo-service
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+  ports:
+  - name: mongodb
+    port: 27017
+    targetPort: mongodb
+    protocol: TCP
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${APP_NAME}-mongo-serviceaccount
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${APP_NAME}-mongo-role
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${APP_NAME}-mongo-rolebinding
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+subjects:
+- kind: ServiceAccount
+  name: ${APP_NAME}-mongo-serviceaccount
+  namespace: ${NAMESPACE}
+roleRef:
+  kind: Role
+  name: ${APP_NAME}-mongo-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${APP_NAME}-mongo-init-scripts
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+data:
+  init-replica-set.js: |
+    // MongoDB StatefulSet initialization script
+    // Initializes replica set and creates application database
+    
+    print('Starting MongoDB replica set initialization...');
+    
+    // Wait for MongoDB to be ready
+    while (!db.adminCommand("ismaster").ismaster) {
+      print('Waiting for MongoDB to become master...');
+      sleep(1000);
+    }
+    
+    // Initialize replica set if not already done
+    try {
+      var config = {
+        _id: process.env.MONGO_REPLICA_SET_NAME,
+        version: 1,
+        members: []
+      };
+      
+      // Add all StatefulSet pods to replica set
+      var replicas = parseInt(process.env.MONGO_REPLICAS || '1');
+      for (var i = 0; i < replicas; i++) {
+        config.members.push({
+          _id: i,
+          host: process.env.POD_NAME.replace('-0', '-' + i) + '.' + 
+                process.env.MONGO_REPLICA_SET_NAME.replace('-rs', '') + '-mongo-headless-service.' +
+                process.env.POD_NAMESPACE + '.svc.cluster.local:27017'
+        });
+      }
+      
+      var result = rs.initiate(config);
+      if (result.ok) {
+        print('Replica set initialized successfully');
+      }
+    } catch (e) {
+      if (e.message.includes('already initialized')) {
+        print('Replica set already initialized');
+      } else {
+        print('Error initializing replica set: ' + e.message);
+      }
+    }
+    
+    // Wait for replica set to be ready
+    while (!rs.isMaster().ismaster) {
+      print('Waiting for replica set to be ready...');
+      sleep(1000);
+    }
+    
+    // Switch to admin database for user creation
+    db = db.getSiblingDB('admin');
+    
+    // Create root user if it doesn't exist
+    try {
+      db.createUser({
+        user: process.env.MONGO_INITDB_ROOT_USERNAME,
+        pwd: process.env.MONGO_INITDB_ROOT_PASSWORD,
+        roles: ['root']
+      });
+      print('Created root user: ' + process.env.MONGO_INITDB_ROOT_USERNAME);
+    } catch (e) {
+      if (e.message.includes('already exists')) {
+        print('Root user already exists');
+      } else {
+        print('Error creating root user: ' + e.message);
+      }
+    }
+    
+    // Switch to application database
+    db = db.getSiblingDB(process.env.MONGO_INITDB_DATABASE);
+    
+    // Create application user
+    try {
+      db.createUser({
+        user: process.env.MONGO_INITDB_ROOT_USERNAME + '_app',
+        pwd: process.env.MONGO_INITDB_ROOT_PASSWORD,
+        roles: [
+          { role: 'readWrite', db: process.env.MONGO_INITDB_DATABASE },
+          { role: 'dbAdmin', db: process.env.MONGO_INITDB_DATABASE }
+        ]
+      });
+      print('Created application user');
+    } catch (e) {
+      if (e.message.includes('already exists')) {
+        print('Application user already exists');
+      } else {
+        print('Error creating application user: ' + e.message);
+      }
+    }
+    
+    // Create collection and indexes
+    if (process.env.MONGO_COLLECTION_NAME) {
+      db.createCollection(process.env.MONGO_COLLECTION_NAME);
+      print('Created collection: ' + process.env.MONGO_COLLECTION_NAME);
+      
+      // Insert sample data for non-production environments
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          db[process.env.MONGO_COLLECTION_NAME].insertMany([
+            {
+              ID: 1,
+              first_name: "John",
+              last_name: "Doe",
+              phone_number: 5551234,
+              rank: "Private",
+              created_at: new Date()
+            },
+            {
+              ID: 2,
+              first_name: "Jane", 
+              last_name: "Smith",
+              phone_number: 5555678,
+              rank: "Corporal",
+              created_at: new Date()
+            }
+          ]);
+          print('Inserted sample data');
+        } catch (e) {
+          print('Sample data may already exist: ' + e.message);
+        }
+      }
+      
+      // Create indexes
+      db[process.env.MONGO_COLLECTION_NAME].createIndex(
+        { "ID": 1 }, 
+        { unique: true, name: "unique_id_index" }
+      );
+      print('Created unique index on ID field');
+    }
+    
+    print('MongoDB StatefulSet initialization completed');
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ${APP_NAME}-mongo-netpol
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongo
+      app.kubernetes.io/instance: ${APP_NAME}-mongo
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from application pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: ${APP_NAME}
+          app.kubernetes.io/component: api
+    ports:
+    - protocol: TCP
+      port: 27017
+  # Allow traffic from same StatefulSet (replica set communication)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: mongo
+          app.kubernetes.io/instance: ${APP_NAME}-mongo
+    ports:
+    - protocol: TCP
+      port: 27017
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow communication between MongoDB replicas
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: mongo
+          app.kubernetes.io/instance: ${APP_NAME}-mongo
+    ports:
+    - protocol: TCP
+      port: 27017
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ${APP_NAME}-mongo-pdb
+  labels:
+    app.kubernetes.io/name: mongo
+    app.kubernetes.io/instance: ${APP_NAME}-mongo
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/component: database
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongo
+      app.kubernetes.io/instance: ${APP_NAME}-mongo
