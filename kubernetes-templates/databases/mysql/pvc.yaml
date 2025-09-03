@@ -1,0 +1,15 @@
+# kubernetes-templates/databases/mysql/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ${APP_NAME}-mysql-pvc
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: ${STORAGE_SIZE}

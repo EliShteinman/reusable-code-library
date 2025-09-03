@@ -1,0 +1,65 @@
+# kubernetes-templates/applications/fastapi-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-api-deployment
+  labels:
+    app.kubernetes.io/name: fastapi-api
+    app.kubernetes.io/instance: ${APP_NAME}-api
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  replicas: ${API_REPLICAS}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: ${APP_NAME}-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fastapi-api
+        app.kubernetes.io/instance: ${APP_NAME}-api
+        app.kubernetes.io/part-of: ${APP_NAME}
+    spec:
+      containers:
+        - name: fastapi-container
+          image: "${DOCKER_IMAGE}:${IMAGE_TAG}"
+          ports:
+            - containerPort: ${API_PORT}
+          env:
+            - name: DB_HOST
+              value: "${APP_NAME}-mysql-service"
+            - name: DB_PORT
+              value: "${DB_PORT}"
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ${APP_NAME}-mysql-config
+                  key: MYSQL_DATABASE
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ${APP_NAME}-mysql-config
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${APP_NAME}-mysql-credentials
+                  key: MYSQL_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /
+              port: ${API_PORT}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: ${API_PORT}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "${API_CPU_REQUEST}"
+              memory: "${API_MEMORY_REQUEST}"
+            limits:
+              cpu: "${API_CPU_LIMIT}"
+              memory: "${API_MEMORY_LIMIT}"

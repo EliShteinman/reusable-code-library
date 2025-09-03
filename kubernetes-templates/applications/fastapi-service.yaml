@@ -1,0 +1,17 @@
+# kubernetes-templates/applications/fastapi-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-api-service
+  labels:
+    app.kubernetes.io/name: fastapi-api
+    app.kubernetes.io/instance: ${APP_NAME}-api
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  selector:
+    app.kubernetes.io/instance: ${APP_NAME}-api
+  ports:
+    - protocol: TCP
+      port: ${API_PORT}
+      targetPort: ${API_PORT}
+  type: ClusterIP

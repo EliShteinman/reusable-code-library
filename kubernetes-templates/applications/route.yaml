@@ -1,0 +1,18 @@
+# kubernetes-templates/applications/route.yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ${APP_NAME}-api-route
+  labels:
+    app.kubernetes.io/name: fastapi-api
+    app.kubernetes.io/instance: ${APP_NAME}-api
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  to:
+    kind: Service
+    name: ${APP_NAME}-api-service
+  port:
+    targetPort: ${API_PORT}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

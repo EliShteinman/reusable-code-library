@@ -1,0 +1,18 @@
+# configuration-templates/requirements/fastapi-mongodb.txt
+# FastAPI with MongoDB
+
+# Core framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Database
+pymongo>=4.5.0
+motor>=3.3.0  # Async MongoDB driver
+
+# Data validation
+pydantic>=2.4.0
+
+# Optional utilities
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]

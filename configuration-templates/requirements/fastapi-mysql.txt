@@ -1,0 +1,18 @@
+# configuration-templates/requirements/fastapi-mysql.txt
+# FastAPI with MySQL - Complete stack
+
+# Core framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Database
+mysql-connector-python>=8.2.0
+
+# Data validation and serialization
+pydantic>=2.4.0
+
+# Optional: Additional useful packages
+python-multipart  # For form data
+python-jose[cryptography]  # For JWT tokens
+passlib[bcrypt]  # For password hashing
+httpx  # For HTTP client requests

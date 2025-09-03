@@ -1,0 +1,8 @@
+# configuration-templates/requirements/testing.txt
+# Testing frameworks and tools
+
+pytest>=7.4.0
+pytest-asyncio>=0.21.0  # For async tests
+httpx>=0.25.0  # For API testing
+pytest-cov>=4.1.0  # Coverage reporting
+faker>=19.0.0  # For generating fake data

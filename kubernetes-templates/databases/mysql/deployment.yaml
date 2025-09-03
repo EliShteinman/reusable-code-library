@@ -1,0 +1,59 @@
+# kubernetes-templates/databases/mysql/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-mysql-deployment
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: ${APP_NAME}-mysql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql
+        app.kubernetes.io/instance: ${APP_NAME}-mysql
+        app.kubernetes.io/part-of: ${APP_NAME}
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:${MYSQL_VERSION}
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - configMapRef:
+                name: ${APP_NAME}-mysql-config
+            - secretRef:
+                name: ${APP_NAME}-mysql-credentials
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
+            initialDelaySeconds: 15
+            timeoutSeconds: 2
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
+            initialDelaySeconds: 45
+            timeoutSeconds: 2
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "${MYSQL_CPU_REQUEST}"
+              memory: "${MYSQL_MEMORY_REQUEST}"
+            limits:
+              cpu: "${MYSQL_CPU_LIMIT}"
+              memory: "${MYSQL_MEMORY_LIMIT}"
+          volumeMounts:
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-persistent-storage
+          persistentVolumeClaim:
+            claimName: ${APP_NAME}-mysql-pvc
