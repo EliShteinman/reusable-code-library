@@ -1,0 +1,70 @@
+# configuration-templates/environment/full-microservices-compose.yml
+version: '3.8'
+name: 'microservices-stack'
+
+services:
+  # --- Infrastructure Services ---
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    ports:
+      - "9092:29092" # Expose Kafka to host for local testing
+    environment:
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: "1"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      CLUSTER_ID: "GN6dEcxIR16qMCV7CauyTw"
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017" # Expose MongoDB to host
+    volumes:
+      - mongodb_data:/data/db
+
+  # --- UI / Management Tools ---
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "9080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "local-kafka"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
+    depends_on:
+      - kafka
+
+  # --- Application Microservices ---
+  # TODO: Add your microservices here. The following is an example service.
+
+  example-processor-service:
+    build:
+      context: .
+      # TODO: Point to the Dockerfile of your service
+      dockerfile: services/example-processor/Dockerfile
+    depends_on:
+      - kafka
+    environment:
+      # --- Common Environment Variables ---
+      LOG_LEVEL: "INFO"
+
+      # --- Kafka Configuration ---
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      KAFKA_INPUT_TOPIC: "raw_data_topic"
+      KAFKA_OUTPUT_TOPIC: "processed_data_topic"
+      KAFKA_GROUP_ID: "processor_group"
+
+      # --- Database Configuration (if needed by this service) ---
+      # MONGO_URI: "mongodb://mongodb:27017/"
+      # MONGO_DB_NAME: "my_database"
+
+volumes:
+  mongodb_data:
