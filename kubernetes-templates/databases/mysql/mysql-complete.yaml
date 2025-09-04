@@ -1,4 +1,51 @@
-# kubernetes-templates/databases/mysql/deployment.yaml
+# kubernetes-templates/databases/mysql/mysql-complete.yaml
+# Complete MySQL Deployment Template
+# Combines all necessary resources for a standard deployment.
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${APP_NAME}-mysql-config
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+    app.kubernetes.io/part-of: ${APP_NAME}
+data:
+  MYSQL_DATABASE: "${DATABASE_NAME}"
+  MYSQL_USER: "${DATABASE_USER}"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${APP_NAME}-mysql-credentials
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+    app.kubernetes.io/part-of: ${APP_NAME}
+stringData:
+  MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+  MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+type: Opaque
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ${APP_NAME}-mysql-pvc
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: ${STORAGE_SIZE}
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,3 +104,20 @@ spec:
         - name: mysql-persistent-storage
           persistentVolumeClaim:
             claimName: ${APP_NAME}-mysql-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-mysql-service
+  labels:
+    app.kubernetes.io/name: mysql
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+    app.kubernetes.io/part-of: ${APP_NAME}
+spec:
+  selector:
+    app.kubernetes.io/instance: ${APP_NAME}-mysql
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306

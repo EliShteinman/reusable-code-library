@@ -5,112 +5,59 @@
 # Stage 1: Build stage with dependencies
 FROM python:3.11-slim as builder
 
-# Set build arguments
 ARG BUILD_DATE
 ARG GIT_COMMIT
 ARG VERSION=1.0.0
 
-# Set environment variables for Python
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=100
 
-# Install system dependencies needed for building
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create app directory
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-# Copy requirements first for better caching
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Production stage
 FROM python:3.11-slim as production
 
-# Set build metadata
+ARG VERSION
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
 LABEL maintainer="Your Team <team@company.com>" \
       version="${VERSION}" \
-      description="Advanced FastAPI MongoDB Service" \
+      description="Advanced FastAPI Service" \
       build-date="${BUILD_DATE}" \
       git-commit="${GIT_COMMIT}"
 
-# Set environment variables
+# --- GENERIC RUNTIME CONFIGURATION ---
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/home/appuser/.local/bin:$PATH" \
-    PORT=8080
+    PORT=8080 \
+    # TODO: Override these variables in your deployment (e.g., Kubernetes YAML) or at build time.
+    APP_MODULE="my_app.main" \
+    APP_VARIABLE="app" \
+    WORKERS_COUNT="1"
 
-# Create non-root user for security
-RUN groupadd -r appuser && \
-    useradd -r -g appuser appuser && \
-    mkdir -p /home/appuser && \
-    chown -R appuser:appuser /home/appuser
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# Set working directory
+RUN groupadd -r appuser && useradd -r -g appuser appuser && mkdir -p /home/appuser && chown -R appuser:appuser /home/appuser
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* && apt-get clean
 WORKDIR /app
-
-# Copy installed packages from builder stage
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
-# Copy application code with proper ownership
-COPY --chown=appuser:appuser ./services /app/services
-COPY --chown=appuser:appuser ./requirements.txt /app/
+# TODO: Adjust the source path to match your project structure. Example: ./my_project
+COPY --chown=appuser:appuser ./my_app /app/my_app
 
-# Create logs directory
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
-
-# Switch to non-root user
 USER appuser
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Expose port
 EXPOSE ${PORT}
 
-# Command to run the application
-CMD ["uvicorn", "services.data_loader.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
-
-# Multi-stage build for development
-FROM production as development
-
-USER root
-
-# Install development dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    vim \
-    && rm -rf /var/lib/apt/lists/*
-
-USER appuser
-
-# Development command with auto-reload
-CMD ["uvicorn", "services.data_loader.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
-
-# Distroless variant for maximum security
-FROM gcr.io/distroless/python3-debian11 as distroless
-
-# Copy from builder stage
-COPY --from=builder /root/.local /home/appuser/.local
-COPY --chown=appuser:appuser ./services /app/services
-
-WORKDIR /app
-EXPOSE 8080
-
-ENV PYTHONPATH="/home/appuser/.local/lib/python3.11/site-packages:/app"
-
-CMD ["services.data_loader.main:app"]
+# Generic command to run the application using ENV variables
+CMD ["uvicorn", "${APP_MODULE}:${APP_VARIABLE}", "--host", "0.0.0.0", "--port", "8080", "--workers", "${WORKERS_COUNT}"]

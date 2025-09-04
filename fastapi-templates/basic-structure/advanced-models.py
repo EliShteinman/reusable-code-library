@@ -11,35 +11,23 @@ PositiveInt = conint(gt=0)
 NonEmptyStr = constr(min_length=1, strip_whitespace=True)
 
 
-class RankEnum(str, Enum):
-    """Military ranks enumeration for validation."""
-    PRIVATE = "Private"
-    CORPORAL = "Corporal"
-    SERGEANT = "Sergeant"
-    LIEUTENANT = "Lieutenant"
-    CAPTAIN = "Captain"
-    MAJOR = "Major"
-    COLONEL = "Colonel"
-    GENERAL = "General"
-    CHIEF_OF_STAFF = "Chief of Staff"
-    PRIME_MINISTER = "Prime Minister"
+# TODO: Customize this Enum with your own statuses/categories
+class StatusEnum(str, Enum):
+    """Enumeration for entity statuses."""
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    PENDING = "pending"
 
 
 class BaseEntityModel(BaseModel):
     """
     Base model for all entities with common fields and configurations.
     """
-
     class Config:
-        # Enable ORM mode for SQLAlchemy/MongoDB compatibility
         from_attributes = True
-        # Allow population by field name or alias
         populate_by_name = True
-        # Use enum values in JSON
         use_enum_values = True
-        # Validate on assignment
         validate_assignment = True
-        # JSON encoding configuration
         json_encoders = {
             datetime: lambda v: v.isoformat() if v else None
         }
@@ -52,113 +40,43 @@ class BaseEntityModel(BaseModel):
         return v
 
 
-class SoldierBase(BaseEntityModel):
+# TODO: Define the base fields for your entity
+class EntityBase(BaseEntityModel):
     """
-    Base soldier model with comprehensive validation.
+    Base model for the entity with core, validated fields.
     """
-    first_name: NonEmptyStr = Field(
-        ...,
-        description="Soldier's first name",
-        example="John",
-        max_length=50
-    )
-    last_name: NonEmptyStr = Field(
-        ...,
-        description="Soldier's last name",
-        example="Doe",
-        max_length=50
-    )
-    phone_number: PositiveInt = Field(
-        ...,
-        description="Soldier's phone number",
-        example=5551234,
-        ge=1000000,  # Minimum 7 digits
-        le=9999999999  # Maximum 10 digits
-    )
-    rank: RankEnum = Field(
-        ...,
-        description="Military rank",
-        example=RankEnum.PRIVATE
-    )
+    name: NonEmptyStr = Field(..., description="Entity's primary name", example="Sample Entity", max_length=100)
+    description: Optional[str] = Field(None, description="A short description of the entity", example="This is a sample entity for demonstration.")
+    status: StatusEnum = Field(..., description="The current status of the entity", example=StatusEnum.ACTIVE)
 
-    @validator('first_name', 'last_name')
-    def validate_name(cls, v):
-        """Validate name fields."""
-        if not v.replace(' ', '').replace('-', '').replace("'", '').isalpha():
-            raise ValueError('Name must contain only letters, spaces, hyphens, and apostrophes')
-        return v.title()  # Capitalize first letter of each word
-
-    @validator('phone_number')
-    def validate_phone(cls, v):
-        """Validate phone number format."""
-        phone_str = str(v)
-        if len(phone_str) < 7 or len(phone_str) > 10:
-            raise ValueError('Phone number must be between 7-10 digits')
-        return v
+    @validator('name')
+    def capitalize_name(cls, v):
+        """Example validator: capitalize the name."""
+        return v.title()
 
 
-class SoldierCreate(SoldierBase):
+# TODO: Define the fields required for creating a new entity
+class EntityCreate(EntityBase):
     """
-    Model for creating a new soldier with ID validation.
+    Model for creating a new entity. Includes a unique business identifier.
     """
-    ID: PositiveInt = Field(
-        ...,
-        description="Unique soldier identifier",
-        example=12345,
-        ge=1,
-        le=999999
-    )
+    external_id: PositiveInt = Field(..., description="Unique business identifier", example=12345)
 
-    @validator('ID')
+    @validator('external_id')
     def validate_id_range(cls, v):
-        """Validate ID is in acceptable range."""
         if v < 1 or v > 999999:
-            raise ValueError('Soldier ID must be between 1 and 999999')
+            raise ValueError('External ID must be between 1 and 999,999')
         return v
 
 
-class SoldierUpdate(BaseEntityModel):
+# TODO: Define the fields that are updatable
+class EntityUpdate(BaseEntityModel):
     """
-    Model for updating soldier information with partial updates.
+    Model for updating an entity. All fields are optional.
     """
-    first_name: Optional[NonEmptyStr] = Field(
-        None,
-        description="Updated first name",
-        max_length=50
-    )
-    last_name: Optional[NonEmptyStr] = Field(
-        None,
-        description="Updated last name",
-        max_length=50
-    )
-    phone_number: Optional[PositiveInt] = Field(
-        None,
-        description="Updated phone number",
-        ge=1000000,
-        le=9999999999
-    )
-    rank: Optional[RankEnum] = Field(
-        None,
-        description="Updated military rank"
-    )
-
-    @validator('first_name', 'last_name')
-    def validate_updated_name(cls, v):
-        """Validate updated name fields."""
-        if v is not None:
-            if not v.replace(' ', '').replace('-', '').replace("'", '').isalpha():
-                raise ValueError('Name must contain only letters, spaces, hyphens, and apostrophes')
-            return v.title()
-        return v
-
-    @validator('phone_number')
-    def validate_updated_phone(cls, v):
-        """Validate updated phone number."""
-        if v is not None:
-            phone_str = str(v)
-            if len(phone_str) < 7 or len(phone_str) > 10:
-                raise ValueError('Phone number must be between 7-10 digits')
-        return v
+    name: Optional[NonEmptyStr] = Field(None, description="Updated name", max_length=100)
+    description: Optional[str] = Field(None, description="Updated description")
+    status: Optional[StatusEnum] = Field(None, description="Updated status")
 
     @root_validator
     def validate_at_least_one_field(cls, values):
@@ -168,277 +86,53 @@ class SoldierUpdate(BaseEntityModel):
         return values
 
 
-class SoldierInDB(SoldierBase):
+class EntityInDB(EntityBase):
     """
-    Complete soldier model as stored in database with metadata.
+    Complete entity model as stored in the database, including metadata.
     """
-    id: PyObjectId = Field(
-        alias="_id",
-        description="MongoDB document ID",
-        example="507f1f77bcf86cd799439011"
-    )
-    ID: PositiveInt = Field(
-        ...,
-        description="Unique soldier identifier",
-        example=12345
-    )
-    created_at: Optional[datetime] = Field(
-        None,
-        description="Record creation timestamp",
-        example="2023-01-15T10:30:00Z"
-    )
-    updated_at: Optional[datetime] = Field(
-        None,
-        description="Last update timestamp",
-        example="2023-01-20T14:45:00Z"
-    )
-    version: Optional[int] = Field(
-        1,
-        description="Document version for optimistic locking",
-        ge=1
-    )
-
-    class Config(SoldierBase.Config):
-        # MongoDB-specific configuration
-        schema_extra = {
-            "example": {
-                "id": "507f1f77bcf86cd799439011",
-                "ID": 12345,
-                "first_name": "John",
-                "last_name": "Doe",
-                "phone_number": 5551234,
-                "rank": "Private",
-                "created_at": "2023-01-15T10:30:00Z",
-                "updated_at": "2023-01-20T14:45:00Z",
-                "version": 1
-            }
-        }
+    id: PyObjectId = Field(alias="_id", description="MongoDB document ID", example="507f1f77bcf86cd799439011")
+    external_id: PositiveInt = Field(..., description="Unique business identifier", example=12345)
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="Record creation timestamp")
+    updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")
+    version: int = Field(1, description="Document version for optimistic locking", ge=1)
 
 
-class SoldierResponse(SoldierInDB):
+class EntityResponse(EntityInDB):
     """
-    Soldier model for API responses with additional computed fields.
+    Entity model for API responses, can include additional computed fields.
     """
-    full_name: Optional[str] = Field(
-        None,
-        description="Computed full name",
-        example="John Doe"
-    )
-    display_rank: Optional[str] = Field(
-        None,
-        description="Formatted rank for display",
-        example="Pvt. John Doe"
-    )
+    display_name: Optional[str] = Field(None, description="Computed display name", example="[Active] Sample Entity")
 
-    @validator('full_name', always=True)
-    def compute_full_name(cls, v, values):
-        """Compute full name from first and last name."""
-        if 'first_name' in values and 'last_name' in values:
-            return f"{values['first_name']} {values['last_name']}"
-        return v
-
-    @validator('display_rank', always=True)
-    def compute_display_rank(cls, v, values):
-        """Compute display rank with abbreviation."""
-        rank_abbrevs = {
-            RankEnum.PRIVATE: "Pvt.",
-            RankEnum.CORPORAL: "Cpl.",
-            RankEnum.SERGEANT: "Sgt.",
-            RankEnum.LIEUTENANT: "Lt.",
-            RankEnum.CAPTAIN: "Capt.",
-            RankEnum.MAJOR: "Maj.",
-            RankEnum.COLONEL: "Col.",
-            RankEnum.GENERAL: "Gen.",
-            RankEnum.CHIEF_OF_STAFF: "CoS",
-            RankEnum.PRIME_MINISTER: "PM"
-        }
-
-        if 'rank' in values and 'first_name' in values and 'last_name' in values:
-            abbrev = rank_abbrevs.get(values['rank'], values['rank'])
-            return f"{abbrev} {values['first_name']} {values['last_name']}"
+    @validator('display_name', always=True)
+    def compute_display_name(cls, v, values):
+        """Example of a computed field for API responses."""
+        if 'status' in values and 'name' in values:
+            return f"[{values['status'].title()}] {values['name']}"
         return v
 
 
-class SoldierSearchRequest(BaseEntityModel):
-    """
-    Model for soldier search requests with filtering options.
-    """
-    first_name: Optional[str] = Field(
-        None,
-        description="Search by first name (partial match)",
-        max_length=50
-    )
-    last_name: Optional[str] = Field(
-        None,
-        description="Search by last name (partial match)",
-        max_length=50
-    )
-    rank: Optional[Union[RankEnum, List[RankEnum]]] = Field(
-        None,
-        description="Filter by rank(s)"
-    )
-    phone_prefix: Optional[str] = Field(
-        None,
-        description="Search by phone number prefix",
-        max_length=4
-    )
-    id_range: Optional[Dict[str, int]] = Field(
-        None,
-        description="Search by ID range (min/max)",
-        example={"min": 1000, "max": 9999}
-    )
-    limit: Optional[conint(ge=1, le=1000)] = Field(
-        100,
-        description="Maximum number of results"
-    )
-    offset: Optional[conint(ge=0)] = Field(
-        0,
-        description="Number of results to skip"
-    )
+# --- Supporting Models for Search and Bulk Operations ---
 
-    @validator('id_range')
-    def validate_id_range(cls, v):
-        """Validate ID range parameters."""
-        if v is not None:
-            if 'min' in v and 'max' in v and v['min'] > v['max']:
-                raise ValueError('Minimum ID must be less than or equal to maximum ID')
-        return v
+class SearchRequest(BaseEntityModel):
+    """Model for search requests with filtering and pagination."""
+    query: Optional[str] = Field(None, description="Generic search query string")
+    status: Optional[List[StatusEnum]] = Field(None, description="Filter by a list of statuses")
+    limit: conint(ge=1, le=500) = 100
+    offset: conint(ge=0) = 0
 
 
-class SoldierSearchResponse(BaseEntityModel):
-    """
-    Response model for soldier search results.
-    """
-    soldiers: List[SoldierResponse] = Field(
-        default_factory=list,
-        description="List of matching soldiers"
-    )
-    total_count: int = Field(
-        0,
-        description="Total number of matching records",
-        ge=0
-    )
-    limit: int = Field(
-        100,
-        description="Applied result limit",
-        ge=1
-    )
-    offset: int = Field(
-        0,
-        description="Applied result offset",
-        ge=0
-    )
-    has_more: bool = Field(
-        False,
-        description="Whether more results are available"
-    )
-
-    @validator('has_more', always=True)
-    def compute_has_more(cls, v, values):
-        """Compute if more results are available."""
-        if 'total_count' in values and 'limit' in values and 'offset' in values:
-            return values['offset'] + values['limit'] < values['total_count']
-        return v
-
-
-class BulkOperationRequest(BaseEntityModel):
-    """
-    Model for bulk operations on soldiers.
-    """
-    operation: str = Field(
-        ...,
-        description="Bulk operation type",
-        regex=r"^(create|update|delete)$"
-    )
-    soldiers: List[Union[SoldierCreate, SoldierUpdate, int]] = Field(
-        ...,
-        description="List of soldiers or IDs for bulk operation",
-        min_items=1,
-        max_items=100
-    )
-
-    @root_validator
-    def validate_operation_data(cls, values):
-        """Validate that operation matches data types."""
-        operation = values.get('operation')
-        soldiers = values.get('soldiers', [])
-
-        if operation == 'create':
-            for item in soldiers:
-                if not isinstance(item, dict) or 'ID' not in item:
-                    raise ValueError('Create operation requires soldier data with ID')
-        elif operation == 'delete':
-            for item in soldiers:
-                if not isinstance(item, int):
-                    raise ValueError('Delete operation requires soldier IDs')
-
-        return values
+class SearchResponse(BaseEntityModel):
+    """Response model for search results."""
+    items: List[EntityResponse] = Field(default_factory=list)
+    total_count: int = Field(0, ge=0)
+    limit: int
+    offset: int
 
 
 class BulkOperationResponse(BaseEntityModel):
-    """
-    Response model for bulk operations.
-    """
-    operation: str = Field(..., description="Performed operation")
-    total_requested: int = Field(..., description="Total items requested", ge=0)
-    successful: int = Field(..., description="Successfully processed items", ge=0)
-    failed: int = Field(..., description="Failed items", ge=0)
-    errors: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="List of errors for failed items"
-    )
-    results: List[Union[SoldierResponse, str]] = Field(
-        default_factory=list,
-        description="Results for successful operations"
-    )
-
-
-# API Response Models
-class APIResponse(BaseEntityModel):
-    """
-    Standard API response wrapper.
-    """
-    success: bool = Field(True, description="Operation success status")
-    message: str = Field("", description="Response message")
-    data: Optional[Any] = Field(None, description="Response data")
-    errors: Optional[List[str]] = Field(None, description="List of errors")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-
-
-class HealthCheckResponse(BaseEntityModel):
-    """
-    Health check response model.
-    """
-    status: str = Field(..., description="Health status", regex=r"^(healthy|unhealthy|unknown)$")
-    service: str = Field(..., description="Service name")
-    version: str = Field(..., description="Service version")
-    timestamp: datetime = Field(..., description="Check timestamp")
-    dependencies: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Dependency health status"
-    )
-    uptime_seconds: Optional[int] = Field(None, description="Service uptime in seconds")
-
-
-# Error Models
-class ValidationErrorDetail(BaseEntityModel):
-    """
-    Detailed validation error information.
-    """
-    field: str = Field(..., description="Field name that failed validation")
-    message: str = Field(..., description="Validation error message")
-    invalid_value: Optional[Any] = Field(None, description="The invalid value provided")
-
-
-class APIErrorResponse(BaseEntityModel):
-    """
-    Standard API error response.
-    """
-    error: str = Field(..., description="Error type")
-    message: str = Field(..., description="Error message")
-    details: Optional[List[ValidationErrorDetail]] = Field(
-        None,
-        description="Detailed validation errors"
-    )
-    request_id: Optional[str] = Field(None, description="Request tracking ID")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    """Response model for bulk operations."""
+    operation: str
+    total_requested: int
+    successful: int
+    failed: int
+    errors: List[Dict[str, Any]] = Field(default_factory=list)

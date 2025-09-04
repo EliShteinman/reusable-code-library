@@ -166,24 +166,42 @@ class MongoDBDataLoader:
             logger.error(f"Error updating item with ID {item_id}: {e}")
             raise RuntimeError(f"Database operation failed: {e}")
 
-    async def delete_item(self, item_id: int) -> bool:
+    async def update_item(
+            self, item_id: int, item_update: Any  # Any can be a Pydantic model
+    ) -> Optional[Dict[str, Any]]:
         """
-        Deletes a document and returns success status.
+        Updates an existing document with partial update support using Pydantic models.
+        Raises RuntimeError if the database is not connected.
         """
         if self.collection is None:
             raise RuntimeError("Database connection is not available")
 
         try:
-            logger.info(f"Attempting to delete item with ID {item_id}")
-            delete_result = await self.collection.delete_one({"ID": item_id})
-            success = delete_result.deleted_count > 0
-            if success:
-                logger.info(f"Successfully deleted item with ID {item_id}")
+            logger.info(f"Attempting to update item with ID {item_id}")
+
+            # Use model_dump to get only the fields that were actually provided for update
+            update_data = item_update.model_dump(exclude_unset=True)
+
+            if not update_data:
+                logger.info(f"No fields to update for item ID {item_id}. Returning current item.")
+                return await self.get_item_by_id(item_id)
+
+            result = await self.collection.find_one_and_update(
+                {"ID": item_id},
+                {"$set": update_data},
+                return_document=True,  # Return the document AFTER the update
+            )
+
+            if result:
+                result["_id"] = str(result["_id"])
+                logger.info(f"Successfully updated item with ID {item_id}")
             else:
-                logger.info(f"No item found to delete with ID {item_id}")
-            return success
+                logger.info(f"No item found to update with ID {item_id}")
+
+            return result
+
         except PyMongoError as e:
-            logger.error(f"Error deleting item with ID {item_id}: {e}")
+            logger.error(f"Error updating item with ID {item_id}: {e}")
             raise RuntimeError(f"Database operation failed: {e}")
 
     async def execute_custom_query(self, query: Dict[str, Any]) -> List[Dict[str, Any]]:
