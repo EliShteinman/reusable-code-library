@@ -109,32 +109,6 @@ class MongoDBDataLoader:
             logger.error(f"Error retrieving item with ID {item_id}: {e}")
             raise RuntimeError(f"Database operation failed: {e}")
 
-    async def create_item(self, item_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Creates a new document with duplicate handling.
-        """
-        if self.collection is None:
-            raise RuntimeError("Database connection is not available")
-
-        try:
-            item_id = item_data.get("ID", "unknown")
-            logger.info(f"Attempting to create item with ID {item_id}")
-
-            insert_result = await self.collection.insert_one(item_data)
-            created_item = await self.collection.find_one(
-                {"_id": insert_result.inserted_id}
-            )
-            if created_item:
-                created_item["_id"] = str(created_item["_id"])
-                logger.info(f"Successfully created item with ID {item_id}")
-            return created_item
-        except DuplicateKeyError:
-            logger.warning(f"Attempt to create duplicate item with ID {item_id}")
-            raise ValueError(f"Item with ID {item_id} already exists")
-        except PyMongoError as e:
-            logger.error(f"Error creating item with ID {item_id}: {e}")
-            raise RuntimeError(f"Database operation failed: {e}")
-
     async def update_item(
             self, item_id: int, item_update: Any  # Any can be a Pydantic model
     ) -> Optional[Dict[str, Any]]:
