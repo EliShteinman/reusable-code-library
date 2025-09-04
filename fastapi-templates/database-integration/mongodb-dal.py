@@ -136,37 +136,6 @@ class MongoDBDataLoader:
             raise RuntimeError(f"Database operation failed: {e}")
 
     async def update_item(
-            self, item_id: int, update_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Updates an existing document with partial update support.
-        """
-        if self.collection is None:
-            raise RuntimeError("Database connection is not available")
-
-        try:
-            logger.info(f"Attempting to update item with ID {item_id}")
-
-            if not update_data:
-                logger.info(f"No fields to update for item ID {item_id}")
-                return await self.get_item_by_id(item_id)
-
-            result = await self.collection.find_one_and_update(
-                {"ID": item_id},
-                {"$set": update_data},
-                return_document=True,
-            )
-            if result:
-                result["_id"] = str(result["_id"])
-                logger.info(f"Successfully updated item with ID {item_id}")
-            else:
-                logger.info(f"No item found to update with ID {item_id}")
-            return result
-        except PyMongoError as e:
-            logger.error(f"Error updating item with ID {item_id}: {e}")
-            raise RuntimeError(f"Database operation failed: {e}")
-
-    async def update_item(
             self, item_id: int, item_update: Any  # Any can be a Pydantic model
     ) -> Optional[Dict[str, Any]]:
         """
