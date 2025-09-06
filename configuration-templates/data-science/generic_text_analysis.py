@@ -100,10 +100,10 @@ class GenericTextAnalyzer(BaseTextAnalyzer):
         Returns:
             Complete analysis results
         """
-        print("🚀 STARTING TEXT ANALYSIS")
-        print(f"📊 Dataset: {len(self.data):,} records")
-        print(f"📝 Text column: {self.config.text_column}")
-        print(f"🏷️ Classification column: {self.config.classification_column}")
+        print("STARTING TEXT ANALYSIS")
+        print(f"Dataset: {len(self.data):,} records")
+        print(f"Text column: {self.config.text_column}")
+        print(f"Classification column: {self.config.classification_column}")
 
         # Run all analysis components
         self.analysis_results = {
@@ -114,7 +114,7 @@ class GenericTextAnalyzer(BaseTextAnalyzer):
             'text_features': self.analyze_text_features()
         }
 
-        print("✅ Analysis completed successfully!")
+        print("Analysis completed successfully!")
         return self.analysis_results
 
     def analyze_text_counts(self) -> Dict[str, Any]:
