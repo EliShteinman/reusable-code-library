@@ -1,6 +1,6 @@
 
 # ============================================================================
-# shared-utilities/data_science/data_loader.py - FILE LOADING ONLY
+# shared-utilities/data_science/data_loader_client.py - FILE LOADING ONLY
 # ============================================================================
 import json
 import logging

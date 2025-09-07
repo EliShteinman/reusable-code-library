@@ -1,4 +1,4 @@
-# configuration-templates/data-science/data_loader.py
+# configuration-templates/data-science/data_loader_client.py
 import pandas as pd
 import logging
 from pathlib import Path

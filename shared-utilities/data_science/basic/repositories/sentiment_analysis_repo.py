@@ -1,4 +1,4 @@
-# shared-utilities/data_science/sentiment_analyzer.py
+# shared-utilities/data_science/sentiment_analysis_repo.py
 import logging
 import os
 from typing import Dict, List, Optional, Any

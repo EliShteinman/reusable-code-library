@@ -3,10 +3,10 @@
 # ============================================================================
 
 import pandas as pd
-from .data_loader import UniversalDataLoader
+from .data_loader_client import UniversalDataLoader
 from .text_cleaner import TextCleaner
 from .text_analyzer import TextAnalyzer
-from .sentiment_analyzer import SentimentAnalyzer
+from .sentiment_analysis_repo import SentimentAnalyzer
 
 
 def example_complete_pipeline():
