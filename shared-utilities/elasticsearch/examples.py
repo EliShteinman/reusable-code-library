@@ -1364,7 +1364,7 @@ if __name__ == "__main__":
     print(f"🏗️  Architecture: CONNECTION clients + CRUD repositories")
     print(
         f"🎯  Ready for exam with clean patterns!")  # ============================================================================
-# shared-utilities/elasticsearch/EXAMPLES.py - COMPLETELY FIXED
+# shared-utilities/elasticsearch/examples.py - COMPLETELY FIXED
 # ============================================================================
 
 import asyncio
