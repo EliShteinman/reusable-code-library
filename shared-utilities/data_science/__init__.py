@@ -71,10 +71,3 @@ def text_cleaning_pipeline(df, text_columns: list, **cleaning_options):
     cleaner = TextCleaner()
     df_clean = cleaner.clean_dataframe(df, text_columns, **cleaning_options)
     return cleaner.remove_empty_texts(df_clean, text_columns)
-
-
-
-
-
-
-

@@ -1,14 +1,18 @@
-
 # ============================================================================
 # USAGE EXAMPLES - CLEAN SEPARATION
 # ============================================================================
+
+import pandas as pd
+from .data_loader import UniversalDataLoader
+from .text_cleaner import TextCleaner
+from .text_analyzer import TextAnalyzer
+from .sentiment_analyzer import SentimentAnalyzer
+
 
 def example_complete_pipeline():
     """Example: Complete text analysis pipeline"""
 
     # Sample data
-    import pandas as pd
-
     sample_data = pd.DataFrame({
         'text': [
             "This is a great product! I love it so much.",
@@ -82,8 +86,6 @@ def example_complete_pipeline():
 def example_sentiment_analysis():
     """Example: Sentiment analysis"""
 
-    import pandas as pd
-
     # Sample data
     reviews = pd.DataFrame({
         'review_text': [
@@ -128,8 +130,6 @@ def example_sentiment_analysis():
 
 def example_text_cleaning():
     """Example: Advanced text cleaning"""
-
-    import pandas as pd
 
     # Messy sample data
     messy_data = pd.DataFrame({

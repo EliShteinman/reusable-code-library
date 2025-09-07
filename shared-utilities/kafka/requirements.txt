@@ -1,0 +1,16 @@
+# ============================================================================
+# shared-utilities/kafka/requirements.txt - KAFKA DEPENDENCIES
+# ============================================================================
+
+# Synchronous Kafka client
+kafka-python==2.0.2
+
+# Asynchronous Kafka client
+aiokafka==0.8.11
+
+# Optional: Better JSON handling (if needed)
+# ujson==5.8.0
+
+# For development and testing
+# pytest==7.4.3
+# pytest-asyncio==0.21.1
