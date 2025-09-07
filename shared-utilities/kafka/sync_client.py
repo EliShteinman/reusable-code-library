@@ -1,5 +1,5 @@
 # ============================================================================
-# shared-utilities/kafka/sync_client.py - SYNCHRONOUS KAFKA CLIENT
+# shared-utilities/kafka/sync_client.py - OPTIMIZED VERSION
 # ============================================================================
 import logging
 import time
@@ -13,6 +13,11 @@ from kafka.errors import KafkaError
 from .json_helpers import serialize_json, deserialize_json, create_kafka_message
 
 logger = logging.getLogger(__name__)
+
+
+def _handle_kafka_error(operation: str, topic: str, error: Exception) -> None:
+    """פונקציה משותפת לטיפול בשגיאות Kafka"""
+    logger.error(f"Failed to {operation} for topic '{topic}': {error}")
 
 
 class KafkaProducerSync:
@@ -45,7 +50,7 @@ class KafkaProducerSync:
             self.producer = SyncKafkaProducer(**default_config)
             logger.info("Sync Kafka Producer created successfully")
         except Exception as e:
-            logger.error(f"Failed to create Kafka Producer: {e}")
+            _handle_kafka_error("create producer", "N/A", e)
             raise
 
     def send_message(self, topic: str, message: Any, key: Optional[str] = None, timeout: int = 10) -> bool:
@@ -73,7 +78,7 @@ class KafkaProducerSync:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to send message to '{topic}': {e}")
+            _handle_kafka_error("send message", topic, e)
             return False
 
     def send_batch(self, topic: str, messages: List[Any], keys: Optional[List[str]] = None) -> int:
@@ -111,7 +116,7 @@ class KafkaProducerSync:
 class KafkaConsumerSync:
     """
     Kafka Consumer סינכרוני
-    עם 2 מתודות עיקריות: האזנה תמידית וקריאת עדכונים
+    עם 3 מתודות עיקריות: האזנה תמידית, קריאת עדכונים, וconsume generator
     """
 
     def __init__(self,
@@ -149,8 +154,20 @@ class KafkaConsumerSync:
             self.last_check_time = datetime.now()
             logger.info(f"Sync Kafka Consumer created for topics: {topics}")
         except Exception as e:
-            logger.error(f"Failed to create Kafka Consumer: {e}")
+            _handle_kafka_error("create consumer", str(topics), e)
             raise
+
+    def _create_message_data(self, message) -> Dict:
+        """יצירת dictionary של נתוני הודעה - פונקציה משותפת"""
+        return {
+            'topic': message.topic,
+            'partition': message.partition,
+            'offset': message.offset,
+            'key': message.key,
+            'value': message.value,
+            'timestamp': message.timestamp,
+            'received_at': datetime.now().isoformat()
+        }
 
     def listen_forever(self, message_handler: Callable[[Dict], bool], max_messages: Optional[int] = None) -> int:
         """
@@ -169,16 +186,8 @@ class KafkaConsumerSync:
         try:
             for message in self.consumer:
                 try:
-                    # עיבוד ההודעה
-                    message_data = {
-                        'topic': message.topic,
-                        'partition': message.partition,
-                        'offset': message.offset,
-                        'key': message.key,
-                        'value': message.value,
-                        'timestamp': message.timestamp
-                    }
-
+                    # שימוש בפונקציה המשותפת
+                    message_data = self._create_message_data(message)
                     success = message_handler(message_data)
 
                     if success:
@@ -200,7 +209,7 @@ class KafkaConsumerSync:
                     continue
 
         except Exception as e:
-            logger.error(f"Error in listen_forever: {e}")
+            _handle_kafka_error("listen forever", str(self.topics), e)
 
         logger.info(f"Processed {processed_count} messages")
         return processed_count
@@ -230,51 +239,34 @@ class KafkaConsumerSync:
 
                 for topic_partition, messages in message_batch.items():
                     for message in messages:
-                        message_data = {
-                            'topic': message.topic,
-                            'partition': message.partition,
-                            'offset': message.offset,
-                            'key': message.key,
-                            'value': message.value,
-                            'timestamp': message.timestamp,
-                            'received_at': datetime.now().isoformat()
-                        }
+                        # שימוש בפונקציה המשותפת
+                        message_data = self._create_message_data(message)
                         new_messages.append(message_data)
 
             # עדכון זמן הבדיקה הקודמת
             self.last_check_time = datetime.now()
 
         except Exception as e:
-            logger.error(f"Error getting new messages: {e}")
+            _handle_kafka_error("get new messages", str(self.topics), e)
 
         logger.info(f"Retrieved {len(new_messages)} new messages")
         return new_messages
 
-    def consume(self, timeout_seconds: int = 5) -> Optional[Dict]:
+    def consume(self):
         """
-        צריכת הודעה יחידה - מחזיר הודעה אחת בכל קריאה
+        צריכת הודעות - generator שמחזיר הודעה אחת בכל קריאה
         לשימוש עם for loop: for message in consumer.consume():
-
-        Args:
-            timeout_seconds: זמן המתנה מקסימלי להודעה
 
         Yields:
             Dictionary עם topic, key, value או None אם אין הודעה
         """
         try:
             for message in self.consumer:
-                yield {
-                    'topic': message.topic,
-                    'partition': message.partition,
-                    'offset': message.offset,
-                    'key': message.key,
-                    'value': message.value,
-                    'timestamp': message.timestamp,
-                    'received_at': datetime.now().isoformat()
-                }
+                # שימוש בפונקציה המשותפת
+                yield self._create_message_data(message)
 
         except Exception as e:
-            logger.error(f"Error in consume: {e}")
+            _handle_kafka_error("consume", str(self.topics), e)
             return
 
     def close(self):

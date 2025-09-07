@@ -1,5 +1,5 @@
 # ============================================================================
-# shared-utilities/kafka/async_client.py - ASYNCHRONOUS KAFKA CLIENT
+# shared-utilities/kafka/async_client.py - FIXED VERSION
 # ============================================================================
 import asyncio
 import logging
@@ -304,6 +304,9 @@ class KafkaConsumerAsync:
 
         except Exception as e:
             logger.error(f"Error getting new messages (async): {e}")
+
+        logger.info(f"Retrieved {len(new_messages)} new messages")
+        return new_messages  # ⭐ FIXED: הוספתי את השורה החסרה!
 
     async def consume(self):
         """

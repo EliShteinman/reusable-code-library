@@ -4,6 +4,7 @@
 import asyncio
 import logging
 from typing import Any, Dict, List, Optional
+from elasticsearch import AsyncElasticsearch
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,6 @@ class ElasticsearchAsyncClient:
         """Create async connection."""
         try:
             # Import here to avoid issues if elasticsearch-async not installed
-            from elasticsearch import AsyncElasticsearch
 
             default_config = {
                 'timeout': 30,

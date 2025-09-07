@@ -1,5 +1,5 @@
 # ============================================================================
-# shared-utilities/kafka/examples.py - דוגמאות שימוש פשוטות
+# shared-utilities/kafka/examples.py - דוגמאות שימוש מלאות ומתוקנות
 # ============================================================================
 import asyncio
 import time
@@ -218,7 +218,95 @@ def json_helpers_example():
 
 
 # ============================================================================
-# דוגמה 5: Error Handling
+# דוגמה 5: consume() Method - הדוגמאות החסרות! ⭐
+# ============================================================================
+
+def consume_example():
+    """דוגמה לשימוש בmethod consume() - FIXED!"""
+    print("=== Consume Method Example (Sync) ===")
+
+    TOPIC = "consume_test_topic"
+
+    # שליחת הודעות לבדיקה
+    producer = KafkaProducerSync()
+    test_messages = [
+        {"item": "laptop", "price": 1200},
+        {"item": "mouse", "price": 25},
+        {"item": "keyboard", "price": 80}
+    ]
+
+    print("Sending test messages...")
+    for msg in test_messages:
+        producer.send_message(TOPIC, msg)
+    producer.close()
+
+    # שימוש ב-consume()
+    consumer = KafkaConsumerSync([TOPIC], group_id="consume_example_group")
+
+    print("Using consume() method:")
+    count = 0
+    try:
+        for message in consumer.consume():
+            if message:
+                data = message['value']['data']
+                print(f"  📦 Item: {data['item']}, Price: ${data['price']}")
+                count += 1
+
+                # עצירה אחרי 3 הודעות
+                if count >= 3:
+                    break
+    except KeyboardInterrupt:
+        print("  Stopped by user")
+
+    consumer.close()
+    print(f"Consumed {count} messages using consume() method\n")
+
+
+async def async_consume_example():
+    """דוגמה לשימוש באסינכרוני consume() - FIXED!"""
+    print("=== Async Consume Method Example ===")
+
+    TOPIC = "async_consume_test_topic"
+
+    # שליחת הודעות
+    producer = KafkaProducerAsync()
+    await producer.start()
+
+    test_messages = [
+        {"event": "user_login", "user_id": 101},
+        {"event": "page_view", "page": "/dashboard"},
+        {"event": "user_logout", "user_id": 101}
+    ]
+
+    print("Sending test messages async...")
+    await producer.send_batch(TOPIC, test_messages)
+    await producer.stop()
+
+    # שימוש באסינכרוני consume()
+    consumer = KafkaConsumerAsync([TOPIC], group_id="async_consume_group")
+    await consumer.start()
+
+    print("Using async consume() method:")
+    count = 0
+    try:
+        async for message in consumer.consume():
+            if message:
+                data = message['value']['data']
+                print(f"  🔄 Event: {data['event']}")
+                count += 1
+
+                # עצירה אחרי 3 הודעות
+                if count >= 3:
+                    break
+    except Exception as e:
+        print(f"  Error: {e}")
+
+    await consumer.stop()
+    print(f"Async consumed {count} messages\n")
+
+
+# ============================================================================
+# דוגמה 6: Error Handling
 # ============================================================================
 
 async def error_handling_example():
@@ -261,7 +349,7 @@ def run_sync_examples():
     try:
         json_helpers_example()
         sync_example()
-        consume_example()  # דוגמה חדשה!
+        consume_example()  # ⭐ דוגמה שתוקנה!
         get_new_messages_example()
         print("✅ All sync examples completed!")
 
@@ -276,7 +364,7 @@ async def run_async_examples():
 
     try:
         await async_example()
-        await async_consume_example()  # דוגמה חדשה!
+        await async_consume_example()  # ⭐ דוגמה שתוקנה!
         await error_handling_example()
         print("✅ All async examples completed!")
 
