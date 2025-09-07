@@ -1,38 +1,167 @@
-# Data Science Utilities - ערכת כלים לניתוח נתונים
+# Data Science Utilities - ערכת כלים מתקדמת לניתוח נתונים
 
-ערכת כלים מקצועית וקלה לשימוש לניתוח טקסט ונתונים, מיועדת למבחנים ופרויקטים אקדמיים.
+ערכת כלים מקצועית עם **ארכיטקטורה כפולה**: יישום בסיסי שתמיד עובד + יישום גנרי מתקדם עם תמיכה בספריות מרובות.
 
-## 📋 תוכן העניינים
+## 🚀 התקנה מהירה
 
-1. [התקנה ודרישות](#התקנה-ודרישות)
-2. [מבנה הספרייה](#מבנה-הספרייה)
-3. [שימוש בסיסי](#שימוש-בסיסי)
-4. [מדריכים מפורטים](#מדריכים-מפורטים)
-5. [דוגמאות קוד](#דוגמאות-קוד)
-6. [טיפים למבחן](#טיפים-למבחן)
-
-## 🚀 התקנה ודרישות
-
-### דרישות מערכת
 ```bash
 pip install pandas numpy nltk
+pip install textblob spacy openpyxl  # אופציונלי למאפיינים מתקדמים
 ```
 
-### ספריות אופציונליות (מומלץ)
-```bash
-pip install openpyxl  # עבור קבצי Excel
-pip install pyarrow   # עבור קבצי Parquet
-pip install lxml      # עבור קבצי XML/HTML
-```
+## 📖 שימוש בסיסי (לתחילת מבחן)
 
-### הגדרה ראשונית
 ```python
-# יבוא כל הכלים
-from shared_utilities.data_science import (
-    UniversalDataLoader,
-    TextCleaner, 
-    TextAnalyzer,
-    SentimentAnalyzer
+from shared_utilities.data_science import *
+
+# טעינת נתונים
+loader = UniversalDataLoader()
+df = loader.load_data("data.csv")
+
+# ניקוי טקסט
+cleaner = TextCleaner()
+df_clean = cleaner.clean_dataframe(df, ['text_column'])
+
+# ניתוח רגשות
+sentiment_analyzer = SentimentAnalyzer()
+df_with_sentiment = sentiment_analyzer.analyze_dataframe(df_clean, 'text_column')
+
+# ניתוח טקסט
+analyzer = TextAnalyzer()
+report = analyzer.generate_summary_report(df_with_sentiment, 'text_column')
+```
+
+## ⚡ שימוש מתקדם (לציונים גבוהים)
+
+### 🔧 Factory Pattern למבחנים
+
+```python
+# יצירת analyzer ספציפי לפי דרישת המבחן
+sentiment_analyzer = ProcessorFactory.create_sentiment_analyzer("textblob")
+text_processor = ProcessorFactory.create_text_processor("spacy")
+
+# אם הספרייה לא זמינה - fallback אוטומטי
+smart_analyzer = SmartSentimentAnalyzer()  # בוחר הטוב ביותר
+```
+
+### 🌟 מולטי-ספריות (עמידות במבחן)
+
+```python
+# בדיקה מה זמין
+available_analyzers = get_available_sentiment_analyzers()
+print(f"Sentiment analyzers: {available_analyzers}")
+
+# שימוש ב-ensemble לדיוק גבוה
+ensemble = EnsembleSentimentAnalyzer(['vader', 'textblob', 'fallback'])
+result = ensemble.analyze_sentiment("Amazing product!")
+```
+
+### 🇮🇱 תמיכה בעברית
+
+```python
+# עיבוד טקסט עברי מתקדם
+hebrew_processor = HebrewTextProcessor()
+roots = hebrew_processor.extract_roots("המוצר הזה מעולה ומומלץ")
+stems = hebrew_processor.extract_stems("אני אוהב את הטכנולוגיה החדשה")
+
+# ניתוח רגשות עברי
+hebrew_sentiment = HebrewSentimentAnalyzer()
+result = hebrew_sentiment.analyze_sentiment("זה מוצר מדהים!")
+```
+
+### 🎯 NLP מתקדם (Stemming & Lemmatization)
+
+```python
+# NLTK מתקדם
+nltk_processor = NLTKTextProcessor()
+stems = nltk_processor.extract_stems("running dogs are eating quickly")
+lemmas = nltk_processor.extract_lemmas("running dogs are eating quickly")
+
+# spaCy מתקדם
+spacy_processor = SpaCyTextProcessor()
+lemmas = spacy_processor.extract_lemmas("The running dogs are eating")
+```
+
+## 🧪 פונקציות מהירות למבחן
+
+### Pipeline מלא
+
+```python
+# ניתוח מלא בשורה אחת
+results = quick_text_analysis_pipeline(
+    file_path="reviews.csv",
+    text_column="review_text",
+    category_column="product_type"
+)
+
+print(f"Processed {results['processing_info']['final_rows']} texts")
+print(f"Sentiment distribution: {results['analysis_report']['common_words']}")
+```
+
+### בדיקת רגשות מהירה
+
+```python
+# בדיקה מהירה לטקסט בודד
+result = quick_sentiment_check("I love this product!", analyzer="vader")
+print(f"Sentiment: {result['label']} (score: {result['compound']})")
+
+# עם fallback אוטומטי אם VADER לא זמין
+result = quick_sentiment_check("Great experience!", analyzer="auto")
+```
+
+### חילוץ מאפיינים מלא
+
+```python
+# כל המאפיינים בפעולה אחת
+features = extract_all_features("The running dogs are eating delicious food")
+print(f"Tokens: {features['tokens']}")
+print(f"Stems: {features['stems']}")
+print(f"Lemmas: {features['lemmas']}")
+print(f"Sentiment: {features['sentiment']}")
+```
+
+## 🎓 תרחישי מבחן נפוצים
+
+### תרחיש 1: "השתמש ב-TextBlob"
+```python
+# המבחן דורש TextBlob ספציפי
+try:
+    analyzer = ProcessorFactory.create_sentiment_analyzer("textblob")
+    result = analyzer.analyze_sentiment(text)
+except:
+    # Fallback אוטומטי
+    analyzer = SmartSentimentAnalyzer()
+    result = analyzer.analyze_sentiment(text)
+```
+
+### תרחיש 2: "בצע stemming ו-lemmatization"
+```python
+# עם NLTK
+processor = NLTKTextProcessor()
+stems = processor.extract_stems(text)
+lemmas = processor.extract_lemmas(text)
+
+# עם spaCy (אם זמין)
+spacy_processor = SpaCyTextProcessor()
+lemmas = spacy_processor.extract_lemmas(text)
+```
+
+### תרחיש 3: "ניתוח טקסט בעברית"
+```python
+# מיוחד לעברית
+hebrew_processor = HebrewTextProcessor()
+tokens = hebrew_processor.tokenize("טקסט בעברית")
+roots = hebrew_processor.extract_roots("המילים האלה")
+sentiment = HebrewSentimentAnalyzer().analyze_sentiment("מוצר מעולה!")
+```
+
+### תרחיש 4: Pipeline בטוח למבחן
+```python
+# יצירת pipeline שתמיד יעבוד
+config = create_exam_safe_pipeline(preferred_sentiment="vader")
+pipeline_result = quick_text_analysis_pipeline(
+    file_path="data.csv",
+    text_column="text"
 )
 ```
 
@@ -40,521 +169,81 @@ from shared_utilities.data_science import (
 
 ```
 shared-utilities/data_science/
-├── __init__.py              # יבואים ופונקציות מהירות
-├── data_loader.py           # טעינת קבצים מכל הפורמטים
-├── text_cleaner.py          # ניקוי טקסט מתקדם
-├── text_analyzer.py         # ניתוח טקסט סטטיסטי
-├── sentiment_analyzer.py    # ניתוח רגשות
-└── EXAMPLES.py             # דוגמאות שימוש מלאות
+├── __init__.py                          # Import כל הפונקציות
+│
+├── data_loader.py                       # טעינת קבצים (CSV, JSON, Excel)
+├── text_cleaner.py                      # ניקוי טקסט בסיסי
+├── text_analyzer.py                     # ניתוח טקסט סטטיסטי
+├── sentiment_analyzer.py                # ניתוח רגשות בסיסי
+│
+├── text_processing_base.py              # ABC Classes + Factory
+├── sentiment_implementations.py         # כל ה-sentiment analyzers
+├── text_processing_implementations.py   # Stemming, Lemmatization, Hebrew
+│
+├── examples.py                          # דוגמאות בסיסיות
+├── examples_advanced.py                 # דוגמאות מתקדמות
+└── README.md                           # המדריך הזה
 ```
 
----
-
-## 🔧 שימוש בסיסי
-
-### 1. טעינת נתונים (UniversalDataLoader)
-
-```python
-# יצירת אובייקט לטעינת נתונים
-loader = UniversalDataLoader()
-
-# טעינת קבצים שונים
-df_csv = loader.load_data("data.csv")
-df_excel = loader.load_data("data.xlsx") 
-df_json = loader.load_data("data.json")
-df_parquet = loader.load_data("data.parquet")
-
-# מידע על הקובץ
-info = loader.get_file_info("data.csv")
-print(info)
-```
-
-**פורמטים נתמכים:**
-- CSV, TSV
-- Excel (xlsx, xls)
-- JSON, JSON Lines
-- Parquet
-- TXT, HTML, XML
-
-### 2. ניקוי טקסט (TextCleaner)
-
-```python
-# יצירת אובייקט לניקוי טקסט
-cleaner = TextCleaner()
-
-# ניקוי בסיסי
-clean_text = cleaner.clean_text(
-    "Check this AMAZING deal!!! http://example.com @user #sale",
-    remove_urls=True,
-    remove_mentions=True,
-    remove_hashtags=True,
-    to_lowercase=True
-)
-# תוצאה: "check this amazing deal"
-
-# ניקוי DataFrame
-df_clean = cleaner.clean_dataframe(
-    df, 
-    ['text_column'],
-    remove_punctuation=True,
-    remove_extra_whitespace=True
-)
-
-# הסרת טקסטים ריקים וקצרים
-df_clean = cleaner.remove_empty_texts(df_clean, ['text_column'])
-df_clean = cleaner.filter_by_length(df_clean, 'text_column', min_length=3, by_chars=False)
-```
-
-### 3. ניתוח רגשות (SentimentAnalyzer)
-
-```python
-# יצירת אובייקט לניתוח רגשות
-sentiment_analyzer = SentimentAnalyzer()
-
-# ניתוח טקסט יחיד
-score = sentiment_analyzer.get_sentiment_score("I love this product!")
-label = sentiment_analyzer.get_sentiment_label("I love this product!")
-detailed = sentiment_analyzer.get_detailed_scores("I love this product!")
-
-print(f"Score: {score}, Label: {label}")
-# Score: 0.6369, Label: positive
-
-# ניתוח DataFrame
-df_with_sentiment = sentiment_analyzer.analyze_dataframe(
-    df, 
-    'text_column',
-    add_detailed=True
-)
-
-# סטטיסטיקות רגשות
-scores = df_with_sentiment['sentiment_score'].tolist()
-stats = sentiment_analyzer.get_sentiment_statistics(scores)
-print(stats)
-```
-
-### 4. ניתוח טקסט (TextAnalyzer)
-
-```python
-# יצירת אובייקט לניתוח טקסט
-analyzer = TextAnalyzer()
-
-# התפלגות טקסטים לפי קטגוריות
-distribution = analyzer.analyze_text_distribution(df, 'text_column', 'category_column')
-
-# ניתוח אורכי טקסטים
-lengths = analyzer.analyze_text_lengths(df, 'text_column')
-print(f"Average words: {lengths['average_word_count']}")
-
-# מילים נפוצות
-common_words = analyzer.find_common_words(df, 'text_column', top_n=10)
-for word_info in common_words[:5]:
-    print(f"{word_info['word']}: {word_info['count']} times")
-
-# חיפוש מילות מפתח
-keywords = ['good', 'bad', 'excellent']
-keyword_results = analyzer.keyword_analysis(df, 'text_column', keywords)
-
-# דוח מקיף
-report = analyzer.generate_summary_report(df, 'text_column', 'category_column', keywords)
-```
-
----
-
-## 📚 מדריכים מפורטים
-
-### Pipeline מלא לניתוח טקסט
-
-```python
-def complete_text_analysis_pipeline(file_path, text_col, category_col=None):
-    """Pipeline מלא לניתוח טקסט"""
-    
-    # 1. טעינת נתונים
-    loader = UniversalDataLoader()
-    df = loader.load_data(file_path)
-    print(f"Loaded: {len(df)} rows")
-    
-    # 2. ניקוי טקסט
-    cleaner = TextCleaner()
-    df_clean = cleaner.clean_dataframe(
-        df, [text_col],
-        remove_urls=True,
-        remove_punctuation=True,
-        to_lowercase=True,
-        remove_extra_whitespace=True
-    )
-    
-    # הסרת טקסטים ריקים וקצרים
-    df_clean = cleaner.remove_empty_texts(df_clean, [text_col])
-    df_clean = cleaner.filter_by_length(df_clean, text_col, min_length=3, by_chars=False)
-    print(f"After cleaning: {len(df_clean)} rows")
-    
-    # 3. ניתוח רגשות
-    sentiment_analyzer = SentimentAnalyzer()
-    df_analyzed = sentiment_analyzer.analyze_dataframe(df_clean, text_col, add_detailed=True)
-    
-    # 4. ניתוח טקסט
-    analyzer = TextAnalyzer()
-    
-    # דוח מקיף
-    keywords = ['good', 'great', 'bad', 'terrible', 'excellent']
-    report = analyzer.generate_summary_report(df_analyzed, text_col, category_col, keywords)
-    
-    return df_analyzed, report
-
-# שימוש
-df_result, analysis_report = complete_text_analysis_pipeline(
-    "reviews.csv", 
-    "review_text", 
-    "product_category"
-)
-```
-
-### ניתוח השוואתי בין קטגוריות
-
-```python
-def compare_categories_sentiment(df, text_col, category_col):
-    """השוואת רגשות בין קטגוריות"""
-    
-    sentiment_analyzer = SentimentAnalyzer()
-    df_with_sentiment = sentiment_analyzer.analyze_dataframe(df, text_col)
-    
-    # סטטיסטיקות לפי קטגוריה
-    category_stats = {}
-    for category in df[category_col].unique():
-        category_data = df_with_sentiment[df_with_sentiment[category_col] == category]
-        scores = category_data['sentiment_score'].tolist()
-        stats = sentiment_analyzer.get_sentiment_statistics(scores)
-        category_stats[category] = stats
-    
-    return category_stats
-
-# שימוש
-stats_by_category = compare_categories_sentiment(df, 'review_text', 'product_type')
-for category, stats in stats_by_category.items():
-    print(f"{category}: Avg sentiment = {stats['average_score']}")
-```
-
----
-
-## 💡 דוגמאות קוד מעשיות
-
-### דוגמה 1: ניתוח ביקורות מוצרים
-
-```python
-import pandas as pd
-from shared_utilities.data_science import *
-
-# יצירת נתוני דוגמה
-reviews_data = pd.DataFrame({
-    'review_text': [
-        "This product is absolutely amazing! Best purchase ever!",
-        "Terrible quality, broke after one day. Very disappointed.",
-        "Good value for money, does what it promises.",
-        "Outstanding customer service and fast delivery!",
-        "Average product, nothing special but works fine."
-    ],
-    'product_category': ['electronics', 'electronics', 'books', 'electronics', 'books'],
-    'rating': [5, 1, 4, 5, 3]
-})
-
-# Pipeline מלא
-def analyze_product_reviews(df):
-    # 1. ניקוי
-    cleaner = TextCleaner()
-    df_clean = cleaner.clean_dataframe(
-        df, ['review_text'],
-        remove_punctuation=True,
-        to_lowercase=True
-    )
-    
-    # 2. ניתוח רגשות
-    sentiment_analyzer = SentimentAnalyzer()
-    df_sentiment = sentiment_analyzer.analyze_dataframe(
-        df_clean, 'review_text', add_detailed=True
-    )
-    
-    # 3. ניתוח טקסט
-    analyzer = TextAnalyzer()
-    
-    # מילים נפוצות
-    common_words = analyzer.find_common_words(df_sentiment, 'review_text', top_n=10)
-    
-    # ניתוח לפי קטגוריה
-    category_analysis = analyzer.analyze_text_distribution(
-        df_sentiment, 'review_text', 'product_category'
-    )
-    
-    # חיפוש מילות מפתח
-    keywords = ['amazing', 'terrible', 'good', 'bad', 'excellent']
-    keyword_analysis = analyzer.keyword_analysis(df_sentiment, 'review_text', keywords)
-    
-    return {
-        'data': df_sentiment,
-        'common_words': common_words,
-        'category_distribution': category_analysis,
-        'keywords': keyword_analysis
-    }
-
-# ביצוע הניתוח
-results = analyze_product_reviews(reviews_data)
-
-# הצגת תוצאות
-print("=== ניתוח ביקורות מוצרים ===")
-print(f"סה\"כ ביקורות: {len(results['data'])}")
-print(f"התפלגות לפי קטגוריה: {results['category_distribution']['by_category']}")
-
-print("\nמילים נפוצות:")
-for word in results['common_words'][:5]:
-    print(f"  {word['word']}: {word['count']} פעמים ({word['percentage']}%)")
-
-print("\nמילות מפתח:")
-for keyword, stats in results['keywords']['keyword_stats'].items():
-    print(f"  '{keyword}': {stats['count']} פעמים")
-```
-
-### דוגמה 2: ניתוח סנטימנט מתקדם
-
-```python
-def advanced_sentiment_analysis(df, text_col):
-    """ניתוח סנטימנט מתקדם עם תובנות"""
-    
-    sentiment_analyzer = SentimentAnalyzer()
-    df_analyzed = sentiment_analyzer.analyze_dataframe(df, text_col, add_detailed=True)
-    
-    # סטטיסטיקות כלליות
-    scores = df_analyzed['sentiment_score'].tolist()
-    stats = sentiment_analyzer.get_sentiment_statistics(scores)
-    
-    # חלוקה לקבוצות סנטימנט
-    positive_texts = df_analyzed[df_analyzed['sentiment_label'] == 'positive']
-    negative_texts = df_analyzed[df_analyzed['sentiment_label'] == 'negative']
-    neutral_texts = df_analyzed[df_analyzed['sentiment_label'] == 'neutral']
-    
-    # מציאת הטקסטים הקיצוניים
-    most_positive = df_analyzed.loc[df_analyzed['sentiment_score'].idxmax()]
-    most_negative = df_analyzed.loc[df_analyzed['sentiment_score'].idxmin()]
-    
-    return {
-        'statistics': stats,
-        'most_positive_text': most_positive[text_col],
-        'most_positive_score': most_positive['sentiment_score'],
-        'most_negative_text': most_negative[text_col],
-        'most_negative_score': most_negative['sentiment_score'],
-        'positive_count': len(positive_texts),
-        'negative_count': len(negative_texts),
-        'neutral_count': len(neutral_texts)
-    }
-
-# שימוש
-sentiment_insights = advanced_sentiment_analysis(reviews_data, 'review_text')
-print(f"הטקסט החיובי ביותר: {sentiment_insights['most_positive_text']}")
-print(f"ציון: {sentiment_insights['most_positive_score']:.3f}")
-```
-
-### דוגמה 3: עיבוד מהיר עם Pipeline Functions
-
-```python
-# שימוש בפונקציות המהירות מ-__init__.py
-from shared_utilities.data_science import (
-    quick_text_analysis_pipeline,
-    sentiment_analysis_pipeline,
-    text_cleaning_pipeline
-)
-
-# Pipeline מהיר מקובץ
-results = quick_text_analysis_pipeline(
-    file_path="reviews.csv",
-    text_column="review_text", 
-    category_column="category"
-)
-
-print(f"נתונים מקוריים: {results['data_info']['original_rows']}")
-print(f"נתונים מנוקים: {results['data_info']['final_rows']}")
-
-# ניקוי מהיר
-df_clean = text_cleaning_pipeline(
-    df, 
-    ['text_column'],
-    remove_punctuation=True,
-    to_lowercase=True,
-    remove_urls=True
-)
-
-# ניתוח רגשות מהיר
-df_sentiment = sentiment_analysis_pipeline(df_clean, 'text_column')
-```
-
----
-
-## 🎯 טיפים למבחן
-
-### נושאים חשובים שכדאי לדעת:
-
-#### 1. **פנדס (Pandas) - נושאים למבחן**
-```python
-# טעינת נתונים
-df = pd.read_csv("file.csv")
-df = pd.read_excel("file.xlsx")
-
-# בדיקת נתונים
-df.info()          # מידע על העמודות
-df.describe()      # סטטיסטיקות בסיסיות
-df.head()          # 5 שורות ראשונות
-df.shape           # מימדי הנתונים
-
-# עיבוד נתונים
-df.dropna()        # הסרת ערכים חסרים
-df.fillna(0)       # מילוי ערכים חסרים
-df.drop_duplicates()  # הסרת כפילויות
-
-# סינון וקיבוץ
-df[df['column'] > 5]  # סינון
-df.groupby('category').mean()  # קיבוץ וחישוב ממוצע
-df.value_counts()     # ספירת ערכים
-```
-
-#### 2. **Text Processing - עקרונות חשובים**
-```python
-# ניקוי טקסט בסיסי
-text = text.lower()                    # הורדת אותיות
-text = re.sub(r'[^\w\s]', '', text)   # הסרת סימני פיסוק
-text = ' '.join(text.split())         # ניקוי רווחים
-
-# טכניקות נפוצות במבחנים
-df['word_count'] = df['text'].str.split().str.len()    # ספירת מילים
-df['char_count'] = df['text'].str.len()                # ספירת תווים
-df['contains_keyword'] = df['text'].str.contains('word')  # חיפוש מילה
-```
-
-#### 3. **Sentiment Analysis - מה חשוב לדעת**
-```python
-# VADER Sentiment - הערכים החשובים
-# compound: -1 (שלילי מאוד) עד 1 (חיובי מאוד)
-# pos, neu, neg: אחוזים שסכומם 1
-
-# סיווג בסיסי
-if compound >= 0.05:
-    sentiment = "positive"
-elif compound <= -0.05:
-    sentiment = "negative" 
-else:
-    sentiment = "neutral"
-```
-
-#### 4. **File Formats - מה יכול להיות במבחן**
-```python
-# CSV - הנפוץ ביותר
-df = pd.read_csv("file.csv", encoding='utf-8')
-
-# JSON - למבנים מורכבים
-df = pd.read_json("file.json")
-
-# Excel - עם sheets
-df = pd.read_excel("file.xlsx", sheet_name="Sheet1")
-
-# Parquet - לקבצים גדולים
-df = pd.read_parquet("file.parquet")
-```
-
-### דוגמאות לשאלות אפשריות במבחן:
-
-**שאלה 1: ניקוי וניתוח טקסט**
-```python
-# נתון DataFrame עם עמודת 'reviews'
-# נקה את הטקסט והסר ביקורות קצרות מ-5 מילים
-
-cleaner = TextCleaner()
-df_clean = cleaner.clean_dataframe(
-    df, ['reviews'],
-    remove_punctuation=True,
-    to_lowercase=True
-)
-df_filtered = cleaner.filter_by_length(df_clean, 'reviews', min_length=5, by_chars=False)
-```
-
-**שאלה 2: חישוב סטטיסטיקות טקסט**
-```python
-# חשב אורך ממוצע של ביקורות לפי קטגוריה
-
-analyzer = TextAnalyzer()
-length_stats = analyzer.analyze_text_lengths(df, 'reviews', 'category')
-print(length_stats['by_category'])
-```
-
-**שאלה 3: ניתוח רגשות**
-```python
-# נתח רגשות ומצא את אחוז הביקורות החיוביות
-
-sentiment_analyzer = SentimentAnalyzer()
-df_sentiment = sentiment_analyzer.analyze_dataframe(df, 'reviews')
-scores = df_sentiment['sentiment_score'].tolist()
-stats = sentiment_analyzer.get_sentiment_statistics(scores)
-print(f"Positive percentage: {stats['positive_percentage']}%")
-```
-
----
-
-## ⚠️ פתרון בעיות נפוצות
+## 🔧 Troubleshooting למבחן
 
 ### בעיה: NLTK לא נמצא
 ```python
-# אם NLTK לא זמין, המערכת תעבור למצב fallback
-# הקוד ימשיך לעבוד עם sentiment analysis פשוט יותר
+# הספרייה תעבור אוטומטית ל-fallback
+# או התקן: pip install nltk
+```
+
+### בעיה: spaCy לא נמצא
+```python
+# pip install spacy
+# python -m spacy download en_core_web_sm
 ```
 
 ### בעיה: קובץ לא נטען
 ```python
-# בדוק את הנתיב והפורמט
+# בדוק פורמטים נתמכים
 loader = UniversalDataLoader()
-try:
-    df = loader.load_data("file.csv")
-except FileNotFoundError:
-    print("הקובץ לא נמצא - בדוק את הנתיב")
-except ValueError as e:
-    print(f"פורמט קובץ לא נתמך: {e}")
+info = loader.get_file_info("file.csv")
+print(info)
 ```
 
-### בעיה: עמודה לא קיימת
+## 🎯 טיפים למבחן
+
+### 1. **תמיד התחל בסיסי:**
 ```python
-# תמיד בדוק שהעמודה קיימת
-if 'text_column' in df.columns:
-    # ביצע את הפעולה
-    pass
-else:
-    print("העמודה לא קיימת")
-    print("עמודות זמינות:", df.columns.tolist())
+from shared_utilities.data_science import UniversalDataLoader, TextCleaner, SentimentAnalyzer
 ```
 
----
-
-## 📝 סיכום לקראת המבחן
-
-### צ'קליסט מוכנות למבחן:
-
-- [ ] **טעינת נתונים**: יודע לטעון CSV, JSON, Excel
-- [ ] **ניקוי טקסט**: הסרת פיסוק, lowercase, ניקוי רווחים
-- [ ] **ניתוח רגשות**: VADER scores, סיווג positive/negative/neutral
-- [ ] **סטטיסטיקות טקסט**: ספירת מילים, מילים נפוצות, אורכי טקסט
-- [ ] **עיבוד DataFrame**: סינון, קיבוץ, value_counts
-- [ ] **Pipeline מלא**: יודע לשלב את כל השלבים
-
-### פקודות מהירות למבחן:
+### 2. **אם המבחן דורש ספרייה ספציפית:**
 ```python
-# טעינה מהירה
-from shared_utilities.data_science import *
-
-# ניתוח מלא במעט שורות
-loader = UniversalDataLoader()
-df = loader.load_data("file.csv")
-
-cleaner = TextCleaner()
-df = cleaner.clean_dataframe(df, ['text'], remove_punctuation=True, to_lowercase=True)
-
-sentiment = SentimentAnalyzer()
-df = sentiment.analyze_dataframe(df, 'text', add_detailed=True)
-
-analyzer = TextAnalyzer()
-report = analyzer.generate_summary_report(df, 'text')
+analyzer = ProcessorFactory.create_sentiment_analyzer("textblob")  # או vader, spacy
 ```
+
+### 3. **אם לא בטוח מה זמין:**
+```python
+smart_analyzer = SmartSentimentAnalyzer()  # יבחר הטוב ביותר
+```
+
+### 4. **לעבודה עם עברית:**
+```python
+hebrew_processor = HebrewTextProcessor()
+hebrew_sentiment = HebrewSentimentAnalyzer()
+```
+
+### 5. **לבדיקות מהירות:**
+```python
+result = quick_sentiment_check("text to analyze")
+features = extract_all_features("text for complete analysis")
+```
+
+## 🏆 יתרונות למבחן
+
+- ✅ **עמידות**: עובד עם כל ספרייה או בלעדיה
+- ✅ **גמישות**: תומך ב-VADER, TextBlob, spaCy, Hebrew
+- ✅ **פשטות**: פונקציות one-liner למבחן מהיר
+- ✅ **מתקדם**: Stemming, Lemmatization, Ensemble
+- ✅ **עברית**: תמיכה מלאה בעיבוד עברית
+- ✅ **Factory Pattern**: ארכיטקטורה מקצועית
+- ✅ **Fallbacks**: תמיד יש פתרון גיבוי
 
 **בהצלחה במבחן! 🎯**
