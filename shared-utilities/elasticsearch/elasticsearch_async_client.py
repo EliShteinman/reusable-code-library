@@ -1,80 +1,64 @@
 # shared-utilities/elasticsearch/elasticsearch_async_client.py
+import asyncio
 import logging
-from elasticsearch import Elasticsearch
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-class ElasticsearchSyncClient:
+class ElasticsearchAsyncClient:
     """
-    Elasticsearch connection client - ONLY handles connections and raw operations.
-    CRUD operations are in ElasticsearchRepository.
+    ASYNC Elasticsearch client - CONNECTIONS ONLY
+    No CRUD operations - only raw elasticsearch operations
     """
 
-    def __init__(self, es_url: str):
+    def __init__(self, es_url: str, **kwargs):
         self.es_url = es_url
-        self.client = None
-        self.connect()
+        self.es = None  # Will be created in connect()
+        self.connected = False
 
-    def connect(self):
-        """Create connection to Elasticsearch."""
+    async def connect(self):
+        """Create async connection."""
         try:
-            self.client = Elasticsearch(self.es_url)
-            info = self.client.info()
-            logger.info(f"Connected to Elasticsearch {info['version']['number']}")
-            return True
+            # Import here to avoid issues if elasticsearch-async not installed
+            from elasticsearch import AsyncElasticsearch
+            self.es = AsyncElasticsearch(self.es_url)
+
+            # Test connection
+            info = await self.es.info()
+            logger.info(f"Connected to Elasticsearch {info['version']['number']} (async)")
+            self.connected = True
+
         except Exception as e:
-            logger.error(f"Failed to connect to Elasticsearch: {e}")
-            return False
+            logger.error(f"Failed to connect to Elasticsearch (async): {e}")
+            raise
 
-    def execute_index(self, index: str, doc: Dict[str, Any], doc_id: str = None):
+    # RAW ASYNC ELASTICSEARCH OPERATIONS
+    async def execute_index(self, index: str, doc: Dict[str, Any], doc_id: str = None):
         """Execute index operation."""
-        if doc_id:
-            return self.client.index(index=index, id=doc_id, body=doc)
-        else:
-            return self.client.index(index=index, body=doc)
+        if not self.connected:
+            raise RuntimeError("Client not connected")
 
-    def execute_get(self, index: str, doc_id: str):
+        if doc_id:
+            return await self.es.index(index=index, id=doc_id, body=doc)
+        else:
+            return await self.es.index(index=index, body=doc)
+
+    async def execute_get(self, index: str, doc_id: str):
         """Execute get operation."""
         try:
-            return self.client.get(index=index, id=doc_id)
+            return await self.es.get(index=index, id=doc_id)
         except Exception as e:
             logger.error(f"Document not found: {e}")
             return None
 
-    def execute_update(self, index: str, doc_id: str, updates: Dict[str, Any]):
-        """Execute update operation."""
-        return self.client.update(index=index, id=doc_id, body={"doc": updates})
-
-    def execute_delete(self, index: str, doc_id: str):
-        """Execute delete operation."""
-        return self.client.delete(index=index, id=doc_id)
-
-    def execute_search(self, index: str, query: Dict[str, Any]):
+    async def execute_search(self, index: str, query: Dict[str, Any]):
         """Execute search operation."""
-        return self.client.search(index=index, body=query)
+        return await self.es.search(index=index, body=query)
 
-    def create_index(self, index: str, mapping: Dict[str, Any] = None):
-        """Create index with mapping."""
-        try:
-            self.client.indices.delete(index=index, ignore=[404])
-            body = {"mappings": mapping} if mapping else None
-            self.client.indices.create(index=index, body=body)
-            logger.info(f"Created index: {index}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to create index: {e}")
-            return False
-
-    def refresh_index(self, index: str):
-        """Refresh index."""
-        return self.client.indices.refresh(index=index)
-
-    def close(self):
-        """Close connection."""
-        try:
-            self.client.close()
-            logger.info("Elasticsearch connection closed")
-        except Exception as e:
-            logger.error(f"Error closing connection: {e}")
+    async def close(self):
+        """Close async connection."""
+        if self.es and self.connected:
+            await self.es.close()
+            self.connected = False
+            logger.info("Elasticsearch async connection closed")

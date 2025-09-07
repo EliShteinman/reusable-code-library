@@ -1,4 +1,7 @@
-# shared-utilities/sql/postgresql_sync_client.py
+
+# ============================================================================
+# shared-utilities/sql/postgresql_sync_client.py - CONNECTIONS ONLY
+# ============================================================================
 import psycopg2
 import psycopg2.extras
 import logging
@@ -10,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 class PostgreSQLSyncClient:
     """
-    PostgreSQL connection client - ONLY handles connections.
-    CRUD operations are in PostgreSQLRepository.
+    PostgreSQL connection client - CONNECTIONS ONLY
+    No CRUD operations - only raw postgresql operations
     """
 
     def __init__(self, host: str, user: str, password: str, database: str, port: int = 5432):
@@ -43,8 +46,9 @@ class PostgreSQLSyncClient:
             if conn:
                 conn.close()
 
+    # RAW POSTGRESQL OPERATIONS ONLY
     def execute_query(self, query: str, params=None, fetch=True):
-        """Execute query with dict results."""
+        """Execute raw query with dict results."""
         with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cursor.execute(query, params or ())
@@ -56,10 +60,29 @@ class PostgreSQLSyncClient:
                 return cursor.rowcount
 
     def execute_returning(self, query: str, params=None):
-        """Execute INSERT/UPDATE with RETURNING clause."""
+        """Execute raw INSERT/UPDATE with RETURNING clause."""
         with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cursor.execute(query, params or ())
             conn.commit()
             result = cursor.fetchone()
             return dict(result) if result else None
+
+    def execute_many(self, query: str, params_list: List[tuple]) -> int:
+        """Execute query with multiple parameter sets."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(query, params_list)
+            conn.commit()
+            return cursor.rowcount
+
+    @contextmanager
+    def transaction(self):
+        """Transaction context manager."""
+        with self.get_connection() as connection:
+            try:
+                yield connection
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise

@@ -1,17 +1,20 @@
-# shared-utilities/sql/mysql_sync_client.py
+
+# ============================================================================
+# shared-utilities/sql/mysql_sync_client.py - CONNECTIONS ONLY
+# ============================================================================
 import mysql.connector
 from mysql.connector import pooling
 import logging
 from contextlib import contextmanager
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 
 logger = logging.getLogger(__name__)
 
 
 class MySQLSyncClient:
     """
-    MySQL connection client - ONLY handles connections.
-    CRUD operations are in MySQLRepository.
+    MySQL connection client - CONNECTIONS ONLY
+    No CRUD operations - only raw mysql operations
     """
 
     def __init__(self, host: str, user: str, password: str, database: str, pool_size: int = 5):
@@ -44,8 +47,9 @@ class MySQLSyncClient:
             if conn:
                 conn.close()
 
+    # RAW MYSQL OPERATIONS ONLY
     def execute_query(self, query: str, params=None, fetch=True):
-        """Execute query - returns results for SELECT, rowcount for others."""
+        """Execute raw query - returns results for SELECT, rowcount for others."""
         with self.get_connection() as conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute(query, params or ())
@@ -57,28 +61,32 @@ class MySQLSyncClient:
                 return cursor.rowcount
 
     def execute_insert(self, query: str, params=None) -> int:
-        """Execute INSERT and return last inserted ID."""
+        """Execute raw INSERT and return last inserted ID."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
             conn.commit()
             return cursor.lastrowid
 
+    def execute_many(self, query: str, params_list: List[tuple]) -> int:
+        """Execute query with multiple parameter sets."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(query, params_list)
+            conn.commit()
+            return cursor.rowcount
+
+    @contextmanager
+    def transaction(self):
+        """Transaction context manager."""
+        with self.get_connection() as connection:
+            try:
+                yield connection
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
     def close(self):
         """Connection pool cleanup."""
         logger.info("MySQL connection pool closed")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

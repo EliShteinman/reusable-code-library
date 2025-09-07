@@ -1,30 +1,74 @@
+# shared-utilities/elasticsearch/elasticsearch_repository.py
 import logging
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Union
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 class ElasticsearchRepository:
     """
-    Elasticsearch CRUD repository - ONLY handles CRUD operations.
-    Requires ElasticsearchSyncClient for connections.
+    Elasticsearch CRUD repository - OPERATIONS ONLY
+    Works with both sync and async clients
     """
 
-    def __init__(self, client, index_name: str):
+    def __init__(self, client: Union[ElasticsearchSyncClient, 'ElasticsearchAsyncClient'], index_name: str):
         self.client = client
         self.index_name = index_name
+        self.is_async = hasattr(client, 'connected')  # Detect async client
 
-    def create(self, document: Dict[str, Any], doc_id: str = None) -> str:
-        """Create new document and return ID."""
-        doc_with_meta = document.copy()
-        doc_with_meta['created_at'] = datetime.now()
+    def _add_metadata(self, doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Add created_at and updated_at to document."""
+        doc_with_meta = doc.copy()
+        now = datetime.now(timezone.utc)
+        doc_with_meta['created_at'] = now
+        doc_with_meta['updated_at'] = now
+        return doc_with_meta
 
+    def _build_query(self, **filters) -> Dict[str, Any]:
+        """Build Elasticsearch query from filters."""
+        must_clauses = []
+        filter_clauses = []
+
+        # Text search
+        if 'query_text' in filters:
+            must_clauses.append({"match": {"_all": filters['query_text']}})
+        else:
+            must_clauses.append({"match_all": {}})
+
+        # Term filters (exact matches)
+        if 'term_filters' in filters:
+            for field, value in filters['term_filters'].items():
+                filter_clauses.append({"term": {field: value}})
+
+        # Range filters
+        if 'range_filters' in filters:
+            for field, range_config in filters['range_filters'].items():
+                filter_clauses.append({"range": {field: range_config}})
+
+        return {
+            "bool": {
+                "must": must_clauses,
+                "filter": filter_clauses
+            }
+        }
+
+    # SYNC CRUD OPERATIONS
+    def create(self, document: Dict[str, Any], doc_id: str = None) -> Optional[str]:
+        """Create document (sync)."""
+        if self.is_async:
+            raise RuntimeError("Use create_async for async client")
+
+        doc_with_meta = self._add_metadata(document)
         result = self.client.execute_index(self.index_name, doc_with_meta, doc_id)
-        return result['_id']
+        return result['_id'] if result else None
 
     def get_by_id(self, doc_id: str) -> Optional[Dict[str, Any]]:
-        """Get document by ID."""
+        """Get document by ID (sync)."""
+        if self.is_async:
+            raise RuntimeError("Use get_by_id_async for async client")
+
         result = self.client.execute_get(self.index_name, doc_id)
         if result:
             doc = result['_source']
@@ -32,63 +76,101 @@ class ElasticsearchRepository:
             return doc
         return None
 
-    def update(self, doc_id: str, updates: Dict[str, Any]) -> bool:
-        """Update document by ID."""
-        try:
-            updates_with_meta = updates.copy()
-            updates_with_meta['updated_at'] = datetime.now()
+    def search(self, limit: int = 10, offset: int = 0, **filters) -> Dict[str, Any]:
+        """Search documents (sync)."""
+        if self.is_async:
+            raise RuntimeError("Use search_async for async client")
 
-            self.client.execute_update(self.index_name, doc_id, updates_with_meta)
-            return True
-        except Exception as e:
-            logger.error(f"Update failed: {e}")
-            return False
-
-    def delete(self, doc_id: str) -> bool:
-        """Delete document by ID."""
-        try:
-            self.client.execute_delete(self.index_name, doc_id)
-            return True
-        except Exception as e:
-            logger.error(f"Delete failed: {e}")
-            return False
-
-    def search_simple(self, query_text: str, fields: List[str] = None, size: int = 10) -> List[Dict[str, Any]]:
-        """Simple text search."""
-        search_fields = fields or ["_all"]
-        query = {
-            "query": {
-                "multi_match": {
-                    "query": query_text,
-                    "fields": search_fields
-                }
-            },
-            "size": size
+        query = self._build_query(**filters)
+        search_body = {
+            "query": query,
+            "from": offset,
+            "size": limit,
+            "sort": [{"created_at": {"order": "desc"}}]
         }
 
-        response = self.client.execute_search(self.index_name, query)
-        results = []
+        result = self.client.execute_search(self.index_name, search_body)
 
-        for hit in response['hits']['hits']:
+        documents = []
+        for hit in result['hits']['hits']:
             doc = hit['_source']
             doc['_id'] = hit['_id']
             doc['_score'] = hit['_score']
-            results.append(doc)
+            documents.append(doc)
 
-        return results
-
-    def search_by_field(self, field: str, value: Any, size: int = 10) -> List[Dict[str, Any]]:
-        """Search by exact field value."""
-        query = {
-            "query": {
-                "term": {field: value}
-            },
-            "size": size
+        return {
+            'total_hits': result['hits']['total']['value'],
+            'documents': documents
         }
 
-        response = self.client.execute_search(self.index_name, query)
-        return [hit['_source'] for hit in response['hits']['hits']]
+    def bulk_create(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Bulk create documents (sync)."""
+        if self.is_async:
+            raise RuntimeError("Use bulk_create_async for async client")
 
-    def create_index_with_mapping(self, mapping: Dict[str, Any] = None):
-        """Create index with mapping."""
+        actions = []
+        for doc in documents:
+            doc_with_meta = self._add_metadata(doc)
+            actions.append({
+                '_index': self.index_name,
+                '_source': doc_with_meta
+            })
+
+        success, failed = self.client.execute_bulk(actions)
+        self.client.refresh_index(self.index_name)
+
+        return {'success_count': success, 'error_count': failed}
+
+    # ASYNC CRUD OPERATIONS
+    async def create_async(self, document: Dict[str, Any], doc_id: str = None) -> Optional[str]:
+        """Create document (async)."""
+        if not self.is_async:
+            raise RuntimeError("Use create for sync client")
+
+        doc_with_meta = self._add_metadata(document)
+        result = await self.client.execute_index(self.index_name, doc_with_meta, doc_id)
+        return result['_id'] if result else None
+
+    async def get_by_id_async(self, doc_id: str) -> Optional[Dict[str, Any]]:
+        """Get document by ID (async)."""
+        if not self.is_async:
+            raise RuntimeError("Use get_by_id for sync client")
+
+        result = await self.client.execute_get(self.index_name, doc_id)
+        if result:
+            doc = result['_source']
+            doc['_id'] = result['_id']
+            return doc
+        return None
+
+    async def search_async(self, limit: int = 10, offset: int = 0, **filters) -> Dict[str, Any]:
+        """Search documents (async)."""
+        if not self.is_async:
+            raise RuntimeError("Use search for sync client")
+
+        query = self._build_query(**filters)
+        search_body = {
+            "query": query,
+            "from": offset,
+            "size": limit,
+            "sort": [{"created_at": {"order": "desc"}}]
+        }
+
+        result = await self.client.execute_search(self.index_name, search_body)
+
+        documents = []
+        for hit in result['hits']['hits']:
+            doc = hit['_source']
+            doc['_id'] = hit['_id']
+            doc['_score'] = hit['_score']
+            documents.append(doc)
+
+        return {
+            'total_hits': result['hits']['total']['value'],
+            'documents': documents
+        }
+
+    # INDEX MANAGEMENT
+    def initialize_index(self, mapping: Dict[str, Any] = None):
+        """Initialize index with mapping."""
         return self.client.create_index(self.index_name, mapping)

@@ -1,9 +1,14 @@
-# shared-utilities/kafka/kafka_async_client.py (Enhanced version of existing)
+
+
+
+# ============================================================================
+# shared-utilities/kafka/kafka_async_client.py - ASYNC CONNECTIONS ONLY
+# ============================================================================
 import asyncio
 import datetime
 import json
 import logging
-from typing import Any, AsyncIterator, Tuple, Sequence
+from typing import Any, AsyncIterator, Dict, List, Optional, Sequence
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
@@ -25,7 +30,10 @@ def _kafka_json_deserializer(data: bytes):
 
 
 class KafkaAsyncProducer:
-    """Enhanced async Kafka producer."""
+    """
+    ASYNC Kafka producer - CONNECTIONS ONLY
+    No high-level patterns - only raw kafka operations
+    """
 
     def __init__(self, bootstrap_servers: str, acks=1, **kwargs):
         self._producer = AIOKafkaProducer(
@@ -46,8 +54,9 @@ class KafkaAsyncProducer:
             await self._producer.stop()
             self._started = False
 
-    async def send_message(self, topic: str, obj: Any, key: str = None) -> bool:
-        """Send single message with error handling."""
+    # RAW ASYNC KAFKA PRODUCER OPERATIONS ONLY
+    async def send_raw(self, topic: str, obj: Any, key: str = None) -> bool:
+        """Send raw message - core async operation."""
         if not self._started:
             raise RuntimeError("Kafka producer is not started")
 
@@ -59,8 +68,8 @@ class KafkaAsyncProducer:
             logger.error(f"Failed to send message to {topic}: {e}")
             return False
 
-    async def send_batch(self, topic: str, messages: list) -> dict:
-        """Send multiple messages."""
+    async def send_batch_raw(self, topic: str, messages: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Send multiple raw messages."""
         success_count = 0
         error_count = 0
 
@@ -72,7 +81,7 @@ class KafkaAsyncProducer:
                 value = msg
                 key = None
 
-            if await self.send_message(topic, value, key):
+            if await self.send_raw(topic, value, key):
                 success_count += 1
             else:
                 error_count += 1
@@ -81,7 +90,10 @@ class KafkaAsyncProducer:
 
 
 class KafkaAsyncConsumer:
-    """Enhanced async Kafka consumer with manual control options."""
+    """
+    ASYNC Kafka consumer - CONNECTIONS ONLY
+    No high-level patterns - only raw kafka operations
+    """
 
     def __init__(self,
                  topics: Sequence[str],
@@ -101,86 +113,4 @@ class KafkaAsyncConsumer:
         self._started = False
         self.auto_commit = auto_commit
         self.topics = topics
-        self.group_id = group_id
-
-    async def start(self):
-        if not self._started:
-            await self._consumer.start()
-            self._started = True
-
-    async def stop(self):
-        if self._started:
-            await self._consumer.stop()
-            self._started = False
-
-    async def consume_continuously(self) -> AsyncIterator[Tuple[str, Any]]:
-        """Continuous message consumption."""
-        if not self._started:
-            raise RuntimeError("Kafka consumer is not started")
-
-        async for msg in self._consumer:
-            yield msg.topic, msg.value
-
-    async def poll_batch(self, timeout_ms: int = 1000, max_records: int = 500) -> list:
-        """Manual polling - get batch of messages."""
-        if not self._started:
-            raise RuntimeError("Kafka consumer is not started")
-
-        try:
-            messages = []
-            end_time = asyncio.get_event_loop().time() + (timeout_ms / 1000)
-
-            while len(messages) < max_records and asyncio.get_event_loop().time() < end_time:
-                try:
-                    msg = await asyncio.wait_for(
-                        self._consumer.__anext__(),
-                        timeout=min(1.0, end_time - asyncio.get_event_loop().time())
-                    )
-                    messages.append({
-                        'topic': msg.topic,
-                        'partition': msg.partition,
-                        'offset': msg.offset,
-                        'key': msg.key,
-                        'value': msg.value,
-                        'timestamp': msg.timestamp,
-                        '_raw_msg': msg  # For manual commit
-                    })
-                except asyncio.TimeoutError:
-                    break
-
-            logger.debug(f"Polled {len(messages)} messages")
-            return messages
-
-        except Exception as e:
-            logger.error(f"Error polling messages: {e}")
-            return []
-
-    async def commit_message(self, message: dict) -> bool:
-        """Manual commit for specific message."""
-        if self.auto_commit:
-            logger.warning("Auto-commit is enabled, manual commit not needed")
-            return True
-
-        try:
-            raw_msg = message.get('_raw_msg')
-            if raw_msg:
-                await self._consumer.commit({
-                    raw_msg.partition: raw_msg.offset + 1
-                })
-                logger.debug(f"Committed offset {raw_msg.offset + 1}")
-                return True
-            else:
-                logger.error("No raw message data for commit")
-                return False
-
-        except Exception as e:
-            logger.error(f"Failed to commit message: {e}")
-            return False
-
-    async def seek_to_beginning(self):
-        """Seek to beginning of all partitions."""
-        self._consumer.seek_to_beginning()
-
-    async def seek_to_end(self):
-        """Seek to end of all partitions."""
-        self._consumer.seek_to_end()
+        self.group_id = group_

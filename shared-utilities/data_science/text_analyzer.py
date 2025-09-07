@@ -1,8 +1,10 @@
-# shared-utilities/data_science/text_analyzer.py
+
+# ============================================================================
+# shared-utilities/data_science/text_analyzer.py - TEXT ANALYSIS ONLY
+# ============================================================================
 import logging
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set
-
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -10,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 class TextAnalyzer:
     """
-    Comprehensive text analysis utility.
-    Based on your generic_text_analysis.py patterns.
+    Text analysis utility - TEXT ANALYSIS ONLY
+    Comprehensive text analysis and statistics
     """
 
     def __init__(self, min_word_length: int = 2):
@@ -21,9 +23,7 @@ class TextAnalyzer:
                                   df: pd.DataFrame,
                                   text_column: str,
                                   category_column: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Analyze text distribution by categories.
-        """
+        """Analyze text distribution by categories."""
         results = {
             'total_texts': len(df),
             'text_column': text_column
@@ -47,10 +47,7 @@ class TextAnalyzer:
                              df: pd.DataFrame,
                              text_column: str,
                              category_column: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Analyze text lengths (characters and words).
-        """
-        # Add length columns
+        """Analyze text lengths (characters and words)."""
         df_analysis = df.copy()
         df_analysis['_char_length'] = df_analysis[text_column].astype(str).str.len()
         df_analysis['_word_count'] = df_analysis[text_column].astype(str).str.split().str.len()
@@ -63,7 +60,9 @@ class TextAnalyzer:
             'max_char_length': df_analysis['_char_length'].max(),
             'max_word_count': df_analysis['_word_count'].max(),
             'min_char_length': df_analysis['_char_length'].min(),
-            'min_word_count': df_analysis['_word_count'].min()
+            'min_word_count': df_analysis['_word_count'].min(),
+            'std_char_length': round(df_analysis['_char_length'].std(), 2),
+            'std_word_count': round(df_analysis['_word_count'].std(), 2)
         }
 
         if category_column and category_column in df_analysis.columns:
@@ -73,7 +72,9 @@ class TextAnalyzer:
                 category_stats[str(category)] = {
                     'avg_char_length': round(cat_data['_char_length'].mean(), 2),
                     'avg_word_count': round(cat_data['_word_count'].mean(), 2),
-                    'count': len(cat_data)
+                    'count': len(cat_data),
+                    'char_length_std': round(cat_data['_char_length'].std(), 2),
+                    'word_count_std': round(cat_data['_word_count'].std(), 2)
                 }
             results['by_category'] = category_stats
 
@@ -83,10 +84,9 @@ class TextAnalyzer:
                           df: pd.DataFrame,
                           text_column: str,
                           top_n: int = 20,
-                          exclude_words: Optional[Set[str]] = None) -> List[Dict[str, Any]]:
-        """
-        Find most common words across all texts.
-        """
+                          exclude_words: Optional[Set[str]] = None,
+                          min_length: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Find most common words across all texts."""
         # Combine all text
         all_text = ' '.join(df[text_column].dropna().astype(str)).lower()
 
@@ -97,18 +97,25 @@ class TextAnalyzer:
         words = clean_text.split()
 
         # Filter words
+        min_length = min_length or self.min_word_length
         filtered_words = [
             word for word in words
-            if len(word) >= self.min_word_length
+            if len(word) >= min_length
                and word.isalpha()
                and (exclude_words is None or word not in exclude_words)
         ]
 
         # Count and return top N
         word_counts = Counter(filtered_words)
+        total_words = len(filtered_words)
 
         return [
-            {'word': word, 'count': count, 'frequency': round(count / len(filtered_words), 4)}
+            {
+                'word': word,
+                'count': count,
+                'frequency': round(count / total_words, 4),
+                'percentage': round(count / total_words * 100, 2)
+            }
             for word, count in word_counts.most_common(top_n)
         ]
 
@@ -118,9 +125,7 @@ class TextAnalyzer:
                                       category_column: str,
                                       top_n: int = 10,
                                       exclude_words: Optional[Set[str]] = None) -> Dict[str, List[Dict[str, Any]]]:
-        """
-        Find common words for each category.
-        """
+        """Find common words for each category."""
         results = {}
 
         for category in df[category_column].dropna().unique():
@@ -138,9 +143,7 @@ class TextAnalyzer:
                            top_n: int = 5,
                            by_words: bool = True,
                            category_column: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Find longest texts by word count or character count.
-        """
+        """Find longest texts by word count or character count."""
         df_analysis = df.copy()
 
         if by_words:
@@ -160,13 +163,15 @@ class TextAnalyzer:
 
                 results[str(category)] = [
                     {
-                        'text': text[:200] + '...' if len(text) > 200 else text,
+                        'text_preview': text[:200] + '...' if len(text) > 200 else text,
                         'length': length,
-                        'full_text': text
+                        'full_text': text,
+                        'index': idx
                     }
-                    for text, length in zip(
+                    for text, length, idx in zip(
                         longest_texts[text_column].tolist(),
-                        longest_texts['_length'].tolist()
+                        longest_texts['_length'].tolist(),
+                        longest_texts.index.tolist()
                     )
                 ]
         else:
@@ -174,13 +179,15 @@ class TextAnalyzer:
             longest_texts = df_analysis.nlargest(top_n, '_length')
             results['overall'] = [
                 {
-                    'text': text[:200] + '...' if len(text) > 200 else text,
+                    'text_preview': text[:200] + '...' if len(text) > 200 else text,
                     'length': length,
-                    'full_text': text
+                    'full_text': text,
+                    'index': idx
                 }
-                for text, length in zip(
+                for text, length, idx in zip(
                     longest_texts[text_column].tolist(),
-                    longest_texts['_length'].tolist()
+                    longest_texts['_length'].tolist(),
+                    longest_texts.index.tolist()
                 )
             ]
 
@@ -189,9 +196,7 @@ class TextAnalyzer:
     def analyze_text_patterns(self,
                               df: pd.DataFrame,
                               text_column: str) -> Dict[str, Any]:
-        """
-        Analyze various text patterns.
-        """
+        """Analyze various text patterns."""
         texts = df[text_column].dropna().astype(str)
 
         # Count various patterns
@@ -202,7 +207,9 @@ class TextAnalyzer:
             'texts_with_mentions': sum(1 for text in texts if '@' in text),
             'texts_with_hashtags': sum(1 for text in texts if '#' in text),
             'texts_with_numbers': sum(1 for text in texts if any(char.isdigit() for char in text)),
-            'texts_all_caps': sum(1 for text in texts if text.isupper() and len(text) > 5)
+            'texts_all_caps': sum(1 for text in texts if text.isupper() and len(text) > 5),
+            'texts_with_punctuation': sum(1 for text in texts if any(char in text for char in '!?.')),
+            'texts_with_quotes': sum(1 for text in texts if '"' in text or "'" in text)
         }
 
         # Calculate percentages
@@ -218,9 +225,7 @@ class TextAnalyzer:
                          text_column: str,
                          keywords: List[str],
                          case_sensitive: bool = False) -> Dict[str, Any]:
-        """
-        Analyze presence of specific keywords.
-        """
+        """Analyze presence of specific keywords."""
         results = {'keywords_analyzed': keywords}
         keyword_stats = {}
 
@@ -233,13 +238,57 @@ class TextAnalyzer:
             count = mask.sum()
             percentage = round(count / len(df) * 100, 2)
 
+            # Get examples
+            examples = df[mask][text_column].tolist()[:5]
+
             keyword_stats[keyword] = {
                 'count': int(count),
                 'percentage': percentage,
-                'texts_with_keyword': df[mask][text_column].tolist()[:5]  # First 5 examples
+                'examples': examples,
+                'example_indices': df[mask].index.tolist()[:5]
             }
 
         results['keyword_stats'] = keyword_stats
+        return results
+
+    def vocabulary_analysis(self,
+                            df: pd.DataFrame,
+                            text_column: str) -> Dict[str, Any]:
+        """Analyze vocabulary richness and diversity."""
+        # Combine all text and extract words
+        all_text = ' '.join(df[text_column].dropna().astype(str)).lower()
+
+        import string
+        translator = str.maketrans('', '', string.punctuation)
+        clean_text = all_text.translate(translator)
+        words = [word for word in clean_text.split() if word.isalpha() and len(word) >= self.min_word_length]
+
+        unique_words = set(words)
+
+        # Calculate vocabulary metrics
+        total_words = len(words)
+        unique_count = len(unique_words)
+
+        results = {
+            'total_words': total_words,
+            'unique_words': unique_count,
+            'vocabulary_richness': round(unique_count / total_words, 4) if total_words > 0 else 0,
+            'average_word_length': round(sum(len(word) for word in unique_words) / unique_count,
+                                         2) if unique_count > 0 else 0,
+            'longest_word': max(unique_words, key=len) if unique_words else '',
+            'shortest_word': min(unique_words, key=len) if unique_words else ''
+        }
+
+        # Word length distribution
+        word_lengths = [len(word) for word in unique_words]
+        if word_lengths:
+            results['word_length_stats'] = {
+                'min': min(word_lengths),
+                'max': max(word_lengths),
+                'mean': round(sum(word_lengths) / len(word_lengths), 2),
+                'median': sorted(word_lengths)[len(word_lengths) // 2]
+            }
+
         return results
 
     def generate_summary_report(self,
@@ -247,14 +296,13 @@ class TextAnalyzer:
                                 text_column: str,
                                 category_column: Optional[str] = None,
                                 keywords: Optional[List[str]] = None) -> Dict[str, Any]:
-        """
-        Generate comprehensive text analysis report.
-        """
+        """Generate comprehensive text analysis report."""
         report = {
             'dataset_info': {
                 'total_texts': len(df),
                 'text_column': text_column,
-                'category_column': category_column
+                'category_column': category_column,
+                'analysis_timestamp': pd.Timestamp.now().isoformat()
             }
         }
 
@@ -263,6 +311,9 @@ class TextAnalyzer:
 
         # Length analysis
         report['length_analysis'] = self.analyze_text_lengths(df, text_column, category_column)
+
+        # Vocabulary analysis
+        report['vocabulary_analysis'] = self.vocabulary_analysis(df, text_column)
 
         # Common words
         report['common_words'] = self.find_common_words(df, text_column, top_n=15)

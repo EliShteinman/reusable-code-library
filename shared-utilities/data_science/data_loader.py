@@ -1,8 +1,11 @@
-# shared-utilities/data_science/data_loader.py
+
+# ============================================================================
+# shared-utilities/data_science/data_loader.py - FILE LOADING ONLY
+# ============================================================================
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import pandas as pd
 
@@ -11,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class UniversalDataLoader:
     """
-    Universal data loader supporting all common formats.
-    Enhanced version based on your app/dal/data_loader.py
+    Universal data loader - FILE LOADING ONLY
+    Supports all common file formats with automatic detection
     """
 
     def __init__(self, data_path: Optional[str] = None, encoding: str = "utf-8"):
@@ -153,3 +156,32 @@ class UniversalDataLoader:
         path_obj.parent.mkdir(parents=True, exist_ok=True)
         save_methods[file_extension]()
         logger.info(f"Data saved to {path}")
+
+    def get_file_info(self, path: str) -> Dict[str, Any]:
+        """Get information about a file."""
+        path_obj = Path(path)
+        if not path_obj.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+
+        info = {
+            'filename': path_obj.name,
+            'extension': path_obj.suffix.lower(),
+            'size_bytes': path_obj.stat().st_size,
+            'size_mb': round(path_obj.stat().st_size / (1024 * 1024), 2),
+            'supported': path_obj.suffix.lower() in self.supported_formats
+        }
+
+        # Try to get preview for supported formats
+        if info['supported']:
+            try:
+                df = self.load_data(path)
+                info.update({
+                    'rows': len(df),
+                    'columns': len(df.columns),
+                    'column_names': list(df.columns),
+                    'dtypes': df.dtypes.to_dict()
+                })
+            except Exception as e:
+                info['load_error'] = str(e)
+
+        return info
